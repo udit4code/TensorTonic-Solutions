@@ -42,11 +42,9 @@ class RankingMetricStrategy(MetricStrategy):
         paired = sorted(zip(y_pred, y_true),reverse=True)
         top_3 = paired[:3]
         relevant = sum(1 for _, rel in top_3 if rel == 1)
-        
         total_relevant = sum(1 for t in y_true if t == 1)
-
+        
         precision_at_3 = relevant / 3
-
         recall_at_3 = (relevant / total_relevant if total_relevant > 0 else 0.0)
 
         return sorted([("precision_at_3", precision_at_3), ("recall_at_3", recall_at_3)])
