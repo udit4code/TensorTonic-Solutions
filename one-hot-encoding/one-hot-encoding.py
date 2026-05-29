@@ -10,7 +10,7 @@ def one_hot(y, num_classes=None):
     # Create all zeros
     result = np.zeros((len(y), num_classes), dtype=np.float32)
     # Advanced indexing: rows: [0,1,2,...N-1] and columns: labels
-    # set those positions to 1
+    # For each row i, go to column y[i] and put a 1 there.
     result[np.arange(len(y)), y] = 1.0
     return result
     
