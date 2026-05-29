@@ -29,4 +29,5 @@ def percentiles(x, queries):
     """
     # Write code here
     # return np.percentile(x, q, method="linear")
-    return np.array([get_percentile_per_query(x, q) for q in queries])
+    result = list(map(lambda q: get_percentile_per_query(x, q), queries))
+    return np.array(result)
