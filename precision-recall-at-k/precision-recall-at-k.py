@@ -1,9 +1,12 @@
+def get_intersection(recommended, relevant, k):
+    return set(recommended[0:k]).intersection(set(relevant))
+    
 def get_precission_at_k(recommended, relevant, k):
-    intersection = set(recommended[0:k]).intersection(set(relevant))
+    intersection = get_intersection(recommended, relevant, k)
     return len(intersection) / k
 
 def get_recall_at_k(recommended, relevant, k):
-    intersection = set(recommended[0:k]).intersection(set(relevant))
+    intersection = get_intersection(recommended, relevant, k)
     return len(intersection) / len(set(relevant))
     
 def precision_recall_at_k(recommended, relevant, k):
