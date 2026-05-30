@@ -17,4 +17,4 @@ def original_and_clipped(data, row_idx, lo, hi):
     # Step 5 : Clip
     clipped_view[low_mask] = lo 
     clipped_view[high_mask] = hi 
-    return [filtered_row, clipped_view]
+    return np.stack([filtered_row, clipped_view])
