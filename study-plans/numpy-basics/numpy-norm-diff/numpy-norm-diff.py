@@ -4,7 +4,7 @@ def get_scaled_and_clipped_data(data, lo, hi):
     # Step 1 : Clip the data matrix in the range [lo, hi]
     clipped_data = np.clip(data, lo, hi)
     # Step 2 : Then, scale the data matrix , such that (x - lo)/(hi - lo) where x = clipped_data[i][j] . We will do broadcasting of scalers.
-    # lo is a scalar, whose shape is (). So, numpy conceptually prepends dimensions of size 1 as (1, 1). Now, (m, n) - (1, 1) = Via Broadcasting, (m, n) - (m, n)
+    # lo or hi is a scalar, whose shape is (). So, numpy conceptually prepends dimensions of size 1 as (1, 1). Now, (m, n) - (1, 1) = Via Broadcasting, (m, n) - (m, n)
     scaled_data = (clipped_data - lo)/(hi - lo)
     return scaled_data
     
