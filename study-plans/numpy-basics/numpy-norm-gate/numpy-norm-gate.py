@@ -1,6 +1,21 @@
 import numpy as np
 
+
 def norm_gate(X, W, threshold):
+    """Returns: np.ndarray of shape (n, k), gated projection where rows below threshold are zeroed"""
+    X = np.asarray(X, dtype=np.float64)
+    W = np.asarray(W, dtype=np.float64)
+    # Step 1 : Z = X @ W
+    Z = X @ W
+    # Step 2 : Get squared norms along rows by collapsing columns
+    squared_norms = np.sum(Z * Z, axis=1)
+    # In mask, norm >= th => squared_norm >= th x th 
+    mask = squared_norms >= threshold * threshold
+    mask = np.reshape(mask, (-1, 1))
+    # Return Final result 
+    return Z * mask
+    
+def norm_gate_v1(X, W, threshold):
     """Returns: np.ndarray of shape (n, k), gated projection where rows below threshold are zeroed"""
     np_X = np.array(X, dtype=np.float64)
     np_W = np.array(W, dtype=np.float64) 
