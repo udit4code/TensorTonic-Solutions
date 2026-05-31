@@ -26,7 +26,8 @@ def sort_with_indices(data, axis):
         cols = np.arange(np_data.shape[1])
         sorted_data = np_data[indices, cols]
     elif axis == 1:
-        rows = np.arange(np_data.shape[0])[:, None]
+        # rows = np.arange(np_data.shape[0])[:, None]
+        rows = np.arange(np_data.shape[0]).reshape(-1, 1)
         sorted_data = np_data[rows, indices]
     else:
         raise ValueError("axis must be 0 or 1 for a 2D array")
