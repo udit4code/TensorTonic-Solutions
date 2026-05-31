@@ -16,5 +16,7 @@ def norm_gate(X, W, threshold):
     mask = L2_norms >= threshold
     mask = np.reshape(mask, (-1, 1))
     # Step 4 : Get the result by element-wise multiplying Z with mask
+    # Via broadcasting, Say, Z = [[1, 1], [2, 2]] whose shape is (2, 2) and mask is [[False], [True]] whose shape is (2, 1)
+    # So, Via broadcasting, (2, 1) -> (2, 2) . So,  [[False], [True]] becomes  [[False, False], [True, True]] = [[0, 0], [1, 1]]
     result = Z * mask
     return result
