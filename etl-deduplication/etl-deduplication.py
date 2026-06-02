@@ -8,17 +8,14 @@ class DeduplicationStrategy(ABC):
         pass
 
 class FirstStrategy(DeduplicationStrategy):
-
     def select(self, records):
         return records[0]
 
 class LastStrategy(DeduplicationStrategy):
-
     def select(self, records):
         return records[-1]
 
 class MostCompleteStrategy(DeduplicationStrategy):
-
     def select(self, records):
         best_record = None
         fewest_missing = float("inf")
