@@ -16,8 +16,11 @@ class CustomLinear(nn.Module):
         # A Customised Linear Layer has 2 types of learnable parameters -> weights matrix and bias vector.
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.empty(out_features))
-        # Initially, they are filled with garbage values. So, we have to initialise them. 
+        # Initially, they are filled with garbage values. So, we have to initialise them with Kaiming Initialisation. 
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+        bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+        nn.init.uniform_(self.bias, -bound, bound)
         
     def forward(self, x):
         # So each row of x is multiplied by W^T and the bias is added. 
