@@ -48,6 +48,38 @@ import torch
 #  ├── data=48
 #  └── grad_fn=SumBackward
 
+# a = x ** 3 will create : a = Tensor(...) and a.grad_fn = PowBackward(x, 3) under the hood, where PowBackward definition is as follows:
+# class PowBackward(Node):
+#     def __init__(self, x, exponent):
+#         self.saved_x = x
+#         self.exponent = exponent
+#     def backward(self, grad_output):
+#         return (grad_output * self.exponent * self.saved_x.data ** (self.exponent - 1))
+
+# Similarly, b = 2 * x creates a new Tensor b and b.grad_fn = MulBackward(x, 2) under the hood, where MulBackward definition is as follows :
+# class MulBackward(Node):
+#     def __init__(self, x, constant):
+#         self.saved_x = x
+#         self.constant = constant
+#     def backward(self, grad_output):
+#         return grad_output * self.constant
+
+
+# c = a + b creates a new Tensor c and c.grad_fn = AddBackward(a, b) under the hood, where AddBackward's definition is as follows :
+# class AddBackward(Node):
+#     def __init__(self, a, b):
+#         self.parents = [a, b]
+#     def backward(self, grad_output):
+#         return (1 * grad_output, 1 * grad_output) # Why ? d(a + b)/db = 1 and d(a + b)/da = 1
+
+# Finally, y = c.sum() will create a new Tensor y and y.grad_fn=SumBackward(c) under the hood, where SumBackward's definition is as follows: 
+
+# class SumBackward(Node):
+#     def __init__(self, c):
+#         self.parents = [c]
+#         self.original_shape = c.shape
+#     def backward(self, grad_output):
+#         return broadcast(grad_output, self.original_shape)
 
 # The computation graph, on the other hand, looks conceptually like : 
 #      SumBackward
