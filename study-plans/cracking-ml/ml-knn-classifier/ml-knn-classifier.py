@@ -1,6 +1,6 @@
 import numpy as np
 
-class KNNClassifier:
+class KNNClassifierV1:
     def __init__(self, k: int = 3):
         self.X_train = None 
         self.y_train = None
@@ -30,12 +30,41 @@ class KNNClassifier:
             prediction = np.bincount(neighbor_labels).argmax()
             predictions.append(prediction)
         return predictions 
+
+class KNNClassifierV2:
+    def __init__(self, k: int = 3):
+        self.X_train = None 
+        self.y_train = None
+        self.k = k
+
+    def fit(self, X, y):
+
+        self.X_train = np.ascontiguousarray(X,dtype=np.float32)
+        self.y_train = np.asarray(y, dtype=np.int64)
+        # Precompute ||x||² for every training point.
+        self.train_norms = np.sum(self.X_train ** 2, axis=1)
+
+    def predict(self, X):
+        predictions = []
+        X = np.asarray(X, dtype=np.float32)
+        for x_test in X:
+            query_norm = np.sum(x_test ** 2)
+            distances = (self.train_norms + query_norm - 2 * self.X_train @ x_test)
+            # O(N) partial sort instead of O(N log N)
+            top_k = np.argpartition(distances, self.k - 1)[:self.k]
+            labels = self.y_train[top_k]
+
+            prediction = np.bincount(labels).argmax()
+            predictions.append(prediction)
+
+        return np.asarray(predictions)
         
 def knn_classify(X_train, y_train, X_test, k=3):
     """
     Returns: A list of predicted integer labels for each test point
     """
-    classifier = KNNClassifier(k)
+    # classifier = KNNClassifierV1(k)
+    classifier = KNNClassifierV2(k)
     classifier.fit(X_train, y_train)
     result = classifier.predict(X_test)
     return result
