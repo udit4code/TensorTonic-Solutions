@@ -54,8 +54,11 @@ class KNNClassifierV2:
             top_k = np.argpartition(distances, self.k - 1)[:self.k]
             labels = self.y_train[top_k]
 
-            prediction = np.bincount(labels).argmax()
-            predictions.append(prediction)
+            # prediction = np.bincount(labels).argmax()
+            frequency_map = np.zeros(labels.max() + 1, dtype=np.int64)
+            for value in labels:
+                frequency_map[value] += 1
+            predictions.append(frequency_map.argmax())
 
         return np.asarray(predictions)
         
