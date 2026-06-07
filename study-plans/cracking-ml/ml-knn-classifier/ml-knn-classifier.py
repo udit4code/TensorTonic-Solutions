@@ -39,9 +39,10 @@ class KNNClassifierV2:
 
     def fit(self, X, y):
 
+        # Optimisation 1 : Why ascontiguousarray ? For better cache-locality, which is loved by BLAS under the hood.
         self.X_train = np.ascontiguousarray(X,dtype=np.float32)
         self.y_train = np.asarray(y, dtype=np.int64)
-        # Precompute ||x||² for every training point.
+        # Optimisation 2 : Precompute ||x||² for every training point.
         self.train_norms = np.sum(self.X_train ** 2, axis=1)
 
     def predict(self, X):
@@ -50,24 +51,73 @@ class KNNClassifierV2:
         for x_test in X:
             query_norm = np.sum(x_test ** 2)
             distances = (self.train_norms + query_norm - 2 * self.X_train @ x_test)
-            # O(N) partial sort instead of O(N log N)
+            # Optimisation 3 : O(N) partial sort instead of O(NlogN) -> O(QN) instead of O(QNlogN)
             top_k = np.argpartition(distances, self.k - 1)[:self.k]
             labels = self.y_train[top_k]
 
-            # prediction = np.bincount(labels).argmax()
+            # Implement own version of bincount , as used otherwise : prediction = np.bincount(labels).argmax()
             frequency_map = np.zeros(labels.max() + 1, dtype=np.int64)
             for value in labels:
                 frequency_map[value] += 1
             predictions.append(frequency_map.argmax())
 
         return np.asarray(predictions)
+
+
+class KNNClassifierV3:
+
+    def __init__(self, k=3):
+        # Number of nearest neighbours
+        self.k = k
+        # Training feature matrix
+        self.X_train = None
+        # Training labels
+        self.y_train = None
+        # Precomputed ||x||² for every training point
+        self.train_norms = None
+
+    def fit(self, X, y):
+        # Store training features in contiguous float32 format.
+        # Why? Better cache locality, Better SIMD utilization and Half the memory of float64
+        self.X_train = np.ascontiguousarray(X, dtype=np.float32)
+        # Labels must be integers for bincount()
+        self.y_train = np.asarray(y, dtype=np.int64)
+        # Precompute ||x||² for every training point. Shape: (N,). Why ? For Reuse across all future queries.
+        self.train_norms = np.sum(self.X_train ** 2, axis=1)
+
+    def predict(self, X):
+        X_test = np.ascontiguousarray(X, dtype=np.float32)
+
+        # Compute ||q||² for every query. Shape: (Q,)
+        query_norms = np.sum(X_test ** 2, axis=1)
+        # Distance formula: ||a-b||² = ||a||² + ||b||² - 2(a·b)
+        # Shapes:
+        #
+        # query_norms[:,None]   -> (Q,1)
+        # train_norms[None,:]   -> (1,N)
+        # X @ X_train.T         -> (Q,N)
+        #
+        # Final: distances             -> (Q,N)
+        distances = (query_norms[:, None] + self.train_norms[None, :] - 2 * (X @ self.X_train.T))
+
+        predictions = []
+        for row in distances:
+            # Find K smallest distances. Complexity: O(N) instead ofO(N log N)
+            top_k = np.argpartition(row, self.k - 1)[:self.k]
+            labels = self.y_train[top_k]
+            # Majority vote : Ties automatically resolve to the smallest label because argmax returns first maximum.
+            prediction = np.bincount(labels).argmax()
+            predictions.append(prediction)
+
+        return np.asarray(predictions, dtype=np.int64)
         
 def knn_classify(X_train, y_train, X_test, k=3):
     """
     Returns: A list of predicted integer labels for each test point
     """
     # classifier = KNNClassifierV1(k)
-    classifier = KNNClassifierV2(k)
+    # classifier = KNNClassifierV2(k)
+    classifier = KNNClassifierV3(k)
     classifier.fit(X_train, y_train)
     result = classifier.predict(X_test)
     return result
