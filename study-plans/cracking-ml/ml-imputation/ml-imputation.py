@@ -1,5 +1,6 @@
 import numpy as np
 
+# Edge case -> [ [None, 2], [None, 4], [None, 6]]
 def impute_via_mean(X):
     X = np.array(X, dtype=np.float64)
     # Step 1 : Find column-wise mean for non_NaN values
