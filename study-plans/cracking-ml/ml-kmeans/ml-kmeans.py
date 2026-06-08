@@ -1,6 +1,20 @@
 import numpy as np
 
+
+# Key Optimisations : Replace broadcasted tensor with matrix-multiply distance formula, Use float32. and Use optimized BLAS (X @ centroids.T).
+
+# Hardware optimisation : why not move matrix multiplication to GPU instead ?
 def get_nearest_centroid_labels(X, centroids, k):
+    # We know : || x − c ||^2 = ||x||^2 + ||c||^2 − 2 (x^T * c)
+    x_norms = np.sum(X ** 2, axis=1, keepdims=True)     # x_norms shape = (n,1)
+    c_norms = np.sum(centroids ** 2,axis=1)     # c_norms shape = (k,)
+    # Via broadcasting, shape of x_norms + c_norms = (n, 1) vs (k, ) = (n, 1) vs (1, k) = (n, k)
+    # So, shape of squared_distances = (n, k) -> So, memory = O(n x k)
+    squared_distances = (x_norms + c_norms - 2 * (X @ centroids.T))
+    labels = np.argmin(squared_distances, axis=1)
+    return labels
+    
+def get_nearest_centroid_labels_v1(X, centroids, k):
     n, d = X.shape 
     # Under the hood, it does :  np.sum((X[:, None, :] - centroids[None, :, :]) ** 2, axis=2) 
     # But, it is difficult to understand. 
@@ -15,6 +29,7 @@ def get_nearest_centroid_labels(X, centroids, k):
     # So, now, centroids become [[[10,20], [30,40]] 
     centroids_reshaped = centroids.reshape(1, k, d)
     # By laws of broadcasting, (3, 1, 2) vs (1, 2, 2) = (3, 2, 2) with an interpretation: 3 points, 2 centroids, 2 features
+    # OPTIMISATION SCOPE : diff's shape is : O(n x k x d) -> Can we optimise here ?
     diff = X_reshaped - centroids_reshaped
     # So, now, diff[0] = For point [1, 2], its diff w.r.t [10, 20] and [30, 40] is [[-9,-18], [-29,-38]].
     # diff[1] = For point [3, 4], its diff w.r.t [10, 20] and [30, 40] is [[-7,-16], [-27,-36]].
@@ -37,7 +52,8 @@ def kmeans(X, k, max_iters=100, seed=42):
     """
     Returns: tuple of (labels as list[int], centroids as list[list[float]])
     """
-    X = np.array(X, dtype=np.float64)
+    # We will choose float32 instead of float64 to bring down memory consumption.
+    X = np.array(X, dtype=np.float32)
     n, d = X.shape
     # Step 1 : Initialize centroids by randomly selecting  k distinct data points 
     # Using a seeded RandomState makes results reproducible.
