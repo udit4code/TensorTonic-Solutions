@@ -1,38 +1,32 @@
 import numpy as np
 
+import numpy as np
 
 def linear_regression_closed_form(X, y):
     """
-    Compute the optimal weight vector using QR decomposition.
-
-    We want to solve the least-squares problem:
-
-        min ||Xw - y||²
-
-    Instead of solving:
-
-        (XᵀX)w = Xᵀy
-
-    we factorize X as:
-
-        X = QR
-
-    where:
-        Q -> orthogonal matrix (QᵀQ = I)
-        R -> upper-triangular matrix
-
-    Substituting:
-
-        QRw = y
-
-    Multiplying both sides by Qᵀ:
-
-        Rw = Qᵀy
-
-    Since R is upper-triangular, we can efficiently solve for w
-    using a linear solver without explicitly computing any matrix inverse.
+    Compute least-squares solution using Singular Value Decomposition (SVD).
     """
 
+    # Convert inputs to float64 for numerical stability.
+    X = np.asarray(X, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    # Full SVD decomposition X = U Σ Vᵀ
+    # U shape      : (m, n)
+    # singular_vals: (n,)
+    # Vt shape     : (n, n)
+    U, singular_vals, Vt = np.linalg.svd(X, full_matrices=False)
+    # Compute Σ⁻¹.
+    # Since Σ is diagonal, inversion is simply
+    # taking reciprocal of each singular value.
+    sigma_inv = np.diag(1.0 / singular_vals)
+    # Apply: w = V Σ⁻¹ Uᵀ y
+    w = Vt.T @ sigma_inv @ U.T @ y
+    return w
+    
+def linear_regression_closed_form_v3(X, y):
+    """
+    Compute the optimal weight vector using QR decomposition.
+    """
     # Convert inputs to contiguous float64 NumPy arrays.
     # float64 is preferred for numerical stability in linear algebra.
     X = np.asarray(X, dtype=np.float64)
