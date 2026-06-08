@@ -42,7 +42,7 @@ def kmeans(X, k, max_iters=100, seed=42):
     # Step 1 : Initialize centroids by randomly selecting  k distinct data points 
     rng = np.random.RandomState(seed)
     indices = rng.choice(n, size=k, replace=False)
-    centroids = X[indices].copy() # Why copy ? Because X[indices]
+    centroids = X[indices] # Why copy ? Because X[indices]
     # Step 2 : Repeat until convergence
     for iteration_id in range(max_iters):
         # Step 2.1 : Assign each point to its nearest centroid using Euclidean distance
@@ -59,5 +59,12 @@ def kmeans(X, k, max_iters=100, seed=42):
         if np.allclose(new_centroids, centroids):
             break
         centroids = new_centroids
+
+    floored_centroids = [ ]
+    for centroid in centroids: 
+        floored_point = [ ]
+        for coordinate in centroid:
+            floored_point.append(np.round(coordinate, 4))
+        floored_centroids.append(floored_point)
         
-    return labels.tolist(), [[round(float(v), 4) for v in c] for c in centroids]
+    return labels.tolist(), floored_centroids
