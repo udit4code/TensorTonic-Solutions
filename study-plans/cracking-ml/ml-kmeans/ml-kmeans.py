@@ -40,6 +40,7 @@ def kmeans(X, k, max_iters=100, seed=42):
     X = np.array(X, dtype=np.float64)
     n, d = X.shape
     # Step 1 : Initialize centroids by randomly selecting  k distinct data points 
+    # Using a seeded RandomState makes results reproducible.
     rng = np.random.RandomState(seed)
     indices = rng.choice(n, size=k, replace=False)
     centroids = X[indices] 
