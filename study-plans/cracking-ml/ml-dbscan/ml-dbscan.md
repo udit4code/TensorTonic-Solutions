@@ -15,21 +15,32 @@
 
 ## <span style="font-size: 16px;">Algorithm</span>
 
-1. <span style="font-size: 14px;">For each unvisited point</span> $p$<span style="font-size: 14px;">:</span>
-   - <span style="font-size: 14px;">Mark</span> $p$ <span style="font-size: 14px;">as visited</span>
-   - <span style="font-size: 14px;">Find all neighbors within</span> $\varepsilon$
-   - <span style="font-size: 14px;">If</span> $|\text{neighbors}| < \texttt{min\_samples}$<span style="font-size: 14px;">, mark as noise</span>
-   - <span style="font-size: 14px;">Otherwise, start a new cluster and expand:</span>
-     - <span style="font-size: 14px;">Add all neighbors to the cluster</span>
-     - <span style="font-size: 14px;">For each unvisited neighbor, find its neighbors. If it is also a core point, add its neighbors to the expansion queue</span>
-     - <span style="font-size: 14px;">Continue until no more points can be added</span>
+1. For each unvisited point \(p\):
+
+   - Mark \(p\) as visited.
+   - Find all neighbors within \(\varepsilon\).
+   - If `len(neighbors) < min_samples`, mark \(p\) as noise.
+   - Otherwise, start a new cluster and expand:
+     - Add all neighbors to the cluster.
+     - For each unvisited neighbor:
+       - Find its neighbors.
+       - If it is a core point, add its neighbors to the expansion queue.
+     - Continue until no more points can be added.
 
 ---
 
-## <span style="font-size: 16px;">Choosing Parameters</span>
+## Choosing Parameters
 
-- $\varepsilon$<span style="font-size: 14px;">: the neighborhood radius. Use a k-distance plot (sort k-nearest-neighbor distances) and look for an elbow</span>
-- `min_samples`<span style="font-size: 14px;">: rule of thumb is</span> $d + 1$ <span style="font-size: 14px;">or</span> $2d$ <span style="font-size: 14px;">where</span> $d$ <span style="font-size: 14px;">is the dimensionality. Higher values produce more conservative clusters</span>
+- **\(\varepsilon\)**:
+  - Neighborhood radius.
+  - Use a k-distance plot and look for the elbow.
+
+- **`min_samples`**:
+  - Common rule of thumb:
+    - \(d + 1\)
+    - \(2d\)
+  - where \(d\) is the dimensionality.
+  - Larger values produce more conservative clusters and more noise points.
 
 ---
 
