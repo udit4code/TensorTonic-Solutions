@@ -15,21 +15,39 @@
 
 ## <span style="font-size: 16px;">Algorithm</span>
 
-1. <span style="font-size: 14px;">For each unvisited point</span> $p$<span style="font-size: 14px;">:</span>
-   - <span style="font-size: 14px;">Mark</span> $p$ <span style="font-size: 14px;">as visited</span>
-   - <span style="font-size: 14px;">Find all neighbors within</span> $\varepsilon$
-   - <span style="font-size: 14px;">If</span> $|\text{neighbors}| < \texttt{min\_samples}$<span style="font-size: 14px;">, mark as noise</span>
-   - <span style="font-size: 14px;">Otherwise, start a new cluster and expand:</span>
-     - <span style="font-size: 14px;">Add all neighbors to the cluster</span>
-     - <span style="font-size: 14px;">For each unvisited neighbor, find its neighbors. If it is also a core point, add its neighbors to the expansion queue</span>
-     - <span style="font-size: 14px;">Continue until no more points can be added</span>
+### DBSCAN Algorithm
+
+For each unvisited point \( p \):
+
+1. Mark \( p \) as visited.
+2. Find all points within distance \( \varepsilon \).
+3. If the number of neighbors is less than `min_samples`:
+   - Mark \( p \) as noise (`-1`).
+4. Otherwise:
+   - Create a new cluster.
+   - Add all neighbors to a queue.
+   - While the queue is not empty:
+     - Remove a point from the queue.
+     - If it is a core point (`neighbors >= min_samples`):
+       - Add its neighbors to the queue.
+     - Assign the point to the cluster.
 
 ---
 
-## <span style="font-size: 16px;">Choosing Parameters</span>
+### Choosing Parameters
 
-- $\varepsilon$<span style="font-size: 14px;">: the neighborhood radius. Use a k-distance plot (sort k-nearest-neighbor distances) and look for an elbow</span>
-- `min_samples`<span style="font-size: 14px;">: rule of thumb is</span> $d + 1$ <span style="font-size: 14px;">or</span> $2d$ <span style="font-size: 14px;">where</span> $d$ <span style="font-size: 14px;">is the dimensionality. Higher values produce more conservative clusters</span>
+- **`eps` (\( \varepsilon \))**
+  - Neighborhood radius.
+  - Often chosen using a k-distance plot and looking for the elbow.
+
+- **`min_samples`**
+  - Typical values:
+    - \( d + 1 \)
+    - \( 2d \)
+  - Higher values:
+    - More robust to noise.
+    - Fewer clusters.
+    - More points labeled as noise.
 
 ---
 
