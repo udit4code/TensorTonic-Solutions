@@ -23,6 +23,7 @@ def pca(X, n_components=2):
     # Step 5 : Project the centered data onto the selected eigenvectors
     X_transformed = X_centered @ components
     # Step 6 : Compute the explained variance ratio for each component
+    # The eigenvalues quantify how much variance lies along each direction.
     total_var = np.sum(eigenvalues)
     explained = eigenvalues[:n_components] / total_var
     return ([[round(float(v), 4) for v in row] for row in X_transformed],
