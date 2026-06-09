@@ -39,13 +39,13 @@ class DBSCAN:
             # if point is already processed
             if labels[point_idx] != self.UNVISITED:
                 continue
-            neighbors = self._find_neighbors(point_idx)
+            neighbors = self.find_neighbors(point_idx)
             # if point is not a core point, then mark it as NOISE
-            if not self._is_core_point(neighbors):
+            if not self.is_core_point(neighbors):
                 labels[point_idx] = self.NOISE
                 continue
             # if point is a core point, then, expand the cluster from it.
-            self._expand_cluster(point_idx,neighbors,cluster_id,labels)
+            self.expand_cluster(point_idx,neighbors,cluster_id,labels)
             cluster_id += 1
 
         self.labels = labels
@@ -79,22 +79,25 @@ class DBSCAN:
         return np.array(predictions)
 
 
-    def _find_neighbors(self, point_idx):
+    def find_neighbors(self, point_idx):
         """
-        Return indices of all points
-        within eps distance.
+        Return indices of all points within eps distance.
         """
         point = self.X_train[point_idx]
-        distances = np.linalg.norm(self.X_train - point,axis=1)
-        return np.where(distances <= self.eps)[0]
+        # distances = np.linalg.norm(self.X_train - point,axis=1)
+        # We want to compute the Euclidean distance from point to every row in self.X_train.
+        distances = np.sqrt(np.sum((self.X_train - point) ** 2,axis=1))
+        # return np.where(distances <= self.eps)[0] : Give me the indices of all training points whose distance from the current point is at most eps
+        neighbors = np.flatnonzero(distances <= self.eps)
+        return neighbors
 
-    def _is_core_point(self, neighbors):
+    def is_core_point(self, neighbors):
         """
         Core point: >= min_samples neighbors
         """
         return len(neighbors) >= self.min_samples
 
-    def _expand_cluster(self, point_idx, neighbors,cluster_id,labels):
+    def expand_cluster(self, point_idx, neighbors,cluster_id,labels):
         """
         BFS expansion.
 
@@ -104,7 +107,6 @@ class DBSCAN:
 
         labels[point_idx] = cluster_id
         queue = deque(neighbors)
-
         while queue:
             current_idx = queue.popleft()
             # Previously marked as noise.
@@ -114,8 +116,8 @@ class DBSCAN:
             if labels[current_idx] != self.UNVISITED:
                 continue
             labels[current_idx] = cluster_id
-            current_neighbors = self._find_neighbors(current_idx)
-            if self._is_core_point(current_neighbors):
+            current_neighbors = self.find_neighbors(current_idx)
+            if self.is_core_point(current_neighbors):
                 queue.extend(current_neighbors)
 
     def _get_core_points(self):
