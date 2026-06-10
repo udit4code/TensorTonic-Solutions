@@ -13,7 +13,26 @@ def compare_models(m1, m2):
     return 0
 
 
+def is_better(a, b):
+    if a["accuracy"] != b["accuracy"]:
+        return a["accuracy"] > b["accuracy"]
+
+    if a["latency"] != b["latency"]:
+        return a["latency"] < b["latency"]
+
+    return a["timestamp"] > b["timestamp"]
+
+
 def promote_model(models):
+    # Time Complexity : O(n)
+    best = None
+    for model in models:
+        if best is None or is_better(model, best):
+            best = model
+    return best["name"]
+
+def promote_model_via_sorting(models):
+    # Time Complexity : O(nlogn)
     """
     Decide which model version to promote to production.
     """
