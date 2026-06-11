@@ -28,7 +28,7 @@ def schedule_pipeline(tasks, resource_budget):
         if degree == 0:
             hq.heappush(ready_queue, task_name)
     # Step 4 : Run Kahn's Topological sorting algorithm
-    running = []
+    running_queue = []
     current_time = 0
     current_resources = 0
     schedule = []
@@ -37,6 +37,7 @@ def schedule_pipeline(tasks, resource_budget):
     total_tasks = len(tasks)
     while len(completed) < total_tasks:
         # Step 4.1 : Schedule tasks from ready_queue within the resource budget.
+        # We make the transition from ready_queue to running.
         skipped = []
         while ready_queue:
             task_name = hq.heappop(ready_queue)
@@ -49,21 +50,23 @@ def schedule_pipeline(tasks, resource_budget):
             schedule.append((task_name, current_time))
             current_resources += needed
             end_time = (current_time + task["duration"])
-            hq.heappush(running, (end_time, task_name))
+            hq.heappush(running_queue, (end_time, task_name))
 
         # Step 4.2 : Put skipped tasks back into ready_queue
         for task_name in skipped:
             hq.heappush(ready_queue, task_name)
-        # Step 4.3 : Advance to next completion
-        if not running:
+        # Step 4.3 : Advance to next completion via Topological sort on running
+        # So, we apply Topological sort on running_queue, not on ready_queue
+        if not running_queue:
             # If not a single running task, then we are as good as done
             break
-        next_time = running[0][0]
+        next_time = running_queue[0][0]
         current_time = next_time
         # Step 4.4 : Complete all tasks ending now
-        while running and running[0][0] == current_time:
-            _, finished_task = hq.heappop(running)
+        while running_queue and running_queue[0][0] == current_time:
+            _, finished_task = hq.heappop(running_queue)
             completed.add(finished_task)
+            # Relinquish the resources held by the completed task
             current_resources -= (task_map[finished_task]["resources"])
             # Step 4.5 : Now, for every running_task that can be ended, we end it and reduce the indegree of its child in the DAG
             for child in graph[finished_task]:
@@ -71,7 +74,5 @@ def schedule_pipeline(tasks, resource_budget):
                 if in_degree[child] == 0:
                     hq.heappush(ready_queue,child)
 
-    return sorted(
-        schedule,
-        key=lambda x: (x[1], x[0])
-    )
+    # task_info = (task_name, timestamp_at_which_it_was_scheduled)
+    return sorted(schedule, key=lambda task_info: (task_info[1], task_info[0]))
