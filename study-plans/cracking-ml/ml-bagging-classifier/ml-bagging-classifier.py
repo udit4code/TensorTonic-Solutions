@@ -1,4 +1,5 @@
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor
 
 # MOTIVATION : Why do we need a bagging classifier ? 
 # In the world of only 1 decision tree, the flow is : Training Data -> Decision Tree -> Predictions.
@@ -128,9 +129,8 @@ class CARTClassifier:
         if self.should_stop(y, depth):
             # If we feel that we should stop, then, simply create a leaf node and return it.
             return self.create_leaf_node(y)
-
+        # Otherwise, we go for the internal node.
         best_feature_idx, best_threshold, gain = self.get_best_split(X,y)
-
         if best_feature_idx is None or gain <= 0:
             return TreeNode(prediction=self.get_majority_class(y))
         # Select all rows in X, where the column corresponding to the feature_idx is less than the best_threshold
@@ -157,25 +157,28 @@ class CARTClassifier:
         best_threshold = None
 
         for feature_idx in range(n_features):
+            # By default, np.unique() returns the sorted unique elements of an array
+            # So, np.unique(X[:, feature_idx]) selects the column with feature_idx across all rows, and returns a sorted list of unique values of column across the rows of X for that given feature_idx
             thresholds = np.unique(X[:, feature_idx])
             for threshold in thresholds:
+                # Now, for each threshold, select all rows that have feature/column value for that feature_idx <= threshold.
+                # Via complementary laws, select all rows that have feature values greater than threshold
                 left_mask = (X[:, feature_idx] <= threshold)
                 right_mask = ~left_mask
 
+                # Count number of values in left_mask and right_mask, because we want the count of number of rows that have value less than threshold for given feature_idx and the other way round.
                 n_left = np.sum(left_mask)
                 n_right = np.sum(right_mask)
                 
                 if n_left == 0 or n_right == 0:
+                    # This is an edge case. So in case, all belong to same mask, then, no point splitting it.
                     continue
 
                 left_gini = self.get_gini_impurity(y[left_mask])
                 right_gini = self.get_gini_impurity(y[right_mask])
-                weighted_gini = (
-                    (n_left / n_samples) * left_gini
-                    +
-                    (n_right / n_samples) * right_gini
-                )
-
+                # Computed weighted_gini across n_left and n_right
+                weighted_gini = ((n_left / n_samples) * left_gini + (n_right / n_samples) * right_gini)
+                # Compute the gini gain by splitting based on threshold, w.r.t its parent gini value
                 gain = (parent_gini - weighted_gini)
 
                 if gain > best_gain:
@@ -244,12 +247,48 @@ class BaggingClassifier:
         X = np.asarray(X, dtype=float)
         y = np.asarray(y)
         self.trees = []
-    
+        # Observation : Each tree acts on a different bootstrapped dataset.
+        # There is no communication among trees during training.
+        # Isn't Training of Trees embarassingly parallel ? So, we have a scope of optimisation.
         for _ in range(self.n_estimators):
+            # For each tree, get a bootstrapped training dataset and then use it to train the tree
             X_bootstrap, y_bootstrap = self.bootstrap_sample(X, y)
             tree = CARTClassifier(max_depth=self.max_depth,min_samples_split=self.min_samples_split)
             tree.fit(X_bootstrap, y_bootstrap)
+            # Once the tree is trained, append it to a global list of trees
             self.trees.append(tree)
+    
+        return self
+
+
+    def fit_v1(self, X, y):
+        """
+            Train n_estimators CART trees in parallel.
+        """
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y)
+    
+        # rng = np.random.RandomState(self.seed)
+        n = len(X)
+
+        training_jobs = []    
+        # Precompute bootstrap samples. This guarantees reproducibility.
+        for _ in range(self.n_estimators):
+            bootstrap_indices = self.rng.randint(0, n, size=n)
+    
+            X_bootstrap = X[bootstrap_indices]
+            y_bootstrap = y[bootstrap_indices]
+    
+            training_jobs.append((X_bootstrap,y_bootstrap,self.max_depth,self.min_samples_split))
+    
+        # Train trees in parallel
+        with ProcessPoolExecutor() as executor:
+            self.trees = list(
+                executor.map(
+                    train_single_tree,
+                    training_jobs
+                )
+            )
     
         return self
 
@@ -301,6 +340,16 @@ class BaggingClassifier:
         classes, counts = np.unique(votes, return_counts=True)
         return classes[np.argmax(counts)]
 
+def train_single_tree(args):
+    X_bootstrap, y_bootstrap, max_depth, min_samples_split = args
+
+    tree = CARTClassifier(
+        max_depth=max_depth,
+        min_samples_split=min_samples_split
+    )
+
+    tree.fit(X_bootstrap, y_bootstrap)
+    return tree
 
         
 def bagging_classify(X_train, y_train, X_test, n_estimators=10, max_depth=5, seed=42):
