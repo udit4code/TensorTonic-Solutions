@@ -65,6 +65,13 @@ class TreeNode:
         self.right = right
         self.prediction = prediction
 
+    # Why did we use property ?
+    # Because, is_leaf is a state, not an action. It can be invoked as node.is_leaf instead of node.is_leaf() like a function. is_leaf is a derived attribute, not a method. 
+    # It avoids storing redundant data. A leaf is not something the node does. A leaf is something the node is.
+    # Tree traversal code becomes cleaner.
+
+    # So the real reason is not performance or ML-specific logic. 
+    # It's simply good object-oriented API design: expose a derived attribute as a property rather than a method.
     @property
     def is_leaf(self):
         return self.prediction is not None
@@ -89,7 +96,7 @@ class CARTClassifier:
         """
         Train CART tree.
         """
-        X = np.asarray(X, dtype=float)
+        X = np.asarray(X, dtype=np.float64)
         y = np.asarray(y)
         self.root = self.build_tree(X=X,y=y,depth=0)
         return self
@@ -98,7 +105,7 @@ class CARTClassifier:
         """
         Predict class labels for a batch.
         """
-        X = np.asarray(X, dtype=float)
+        X = np.asarray(X, dtype=np.float64)
         return np.array(
             [
                 self.predict_single_sample(self.root, sample)
@@ -106,22 +113,37 @@ class CARTClassifier:
             ]
         )
 
+    def should_stop(self, y, depth):
+        return (depth >= self.max_depth or len(y) < self.min_samples_split or len(np.unique(y)) == 1)
+
+    def create_leaf_node(self, y):
+        return TreeNode(prediction=self.get_majority_class(y))
+        
     def build_tree(self,X,y,depth):
         """
         Recursively build CART tree.
         """
-        if (depth >= self.max_depth or len(y) < self.min_samples_split or len(np.unique(y)) == 1):
+        assert isinstance(X, np.ndarray), f"X : {X} must be a numpy array in build_tree"
+        assert isinstance(y, np.ndarray), f"y : {y} must be a numpy array in build_tree"
+        if self.should_stop(y, depth):
+            # If we feel that we should stop, then, simply create a leaf node and return it.
+            return self.create_leaf_node(y)
+
+        best_feature_idx, best_threshold, gain = self.get_best_split(X,y)
+
+        if best_feature_idx is None or gain <= 0:
             return TreeNode(prediction=self.get_majority_class(y))
-
-        feature, threshold, gain = self.get_best_split(X,y)
-
-        if feature is None or gain <= 0:
-            return TreeNode(prediction=self.get_majority_class(y))
-
-        left_mask = X[:, feature] <= threshold
+        # Select all rows in X, where the column corresponding to the feature_idx is less than the best_threshold
+        left_mask = X[:, best_feature_idx] <= best_threshold
         left_child = self.build_tree(X[left_mask],y[left_mask],depth + 1)
         right_child = self.build_tree(X[~left_mask],y[~left_mask],depth + 1)
-        return TreeNode(feature_index=feature,threshold=threshold,left=left_child,right=right_child)
+        # Create an internal node and return it
+        return TreeNode(
+            feature_index=best_feature_idx,
+            threshold=best_threshold,
+            left=left_child,
+            right=right_child
+        )
 
 
     def get_best_split(self,X,y):
