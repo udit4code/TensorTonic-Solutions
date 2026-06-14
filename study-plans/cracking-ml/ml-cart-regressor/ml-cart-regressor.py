@@ -1,5 +1,29 @@
 import numpy as np
 
+
+# Assumptions : Our CART-style regression tree evaluates splits at every observed feature value rather than at midpoints between consecutive values.
+# This makes it ideal for toy-educational case of Discrete Features, while computationally intensive for production cases.
+# Eg : X = [1, 3, 5, 7] And using the current splitting logic, using thresholds = np.unique(X) gives us [1, 3, 5, 7]
+# In this case, the meaningful splits are : x <= 1 [1 | 3, 5, 7], 1 < x <= 3 [1, 3 | 5, 7], 3 < x <= 5 [1, 3, 5 | 7]
+# and 5 < x <= 7 [1, 3, 5, 7 | ]. The last split is useless since it puts everything to the left.
+
+# Now, Assume we have continuous values : X = [1.2341, 1.2342, 1.2343, ...] and len(X) = 10000
+# So, do we make around 10000 splits based on the above approach ? No, because it is very expensive and many of the splits are redundant.
+# We use the midpoint approach because a decision tree only cares about how a threshold partitions the samples into a left and right group, not about the exact threshold value itself. 
+# For sorted feature values like [1, 3, 5, 7], any threshold between 1 and 3 (e.g., 1.5, 2, 2.9) produces the exact same split: {1} goes left and {3,5,7} goes right. 
+# Therefore, instead of evaluating every possible threshold or every observed value, we evaluate a single representative threshold, which turns out to be the midpoint between consecutive unique values—which guarantees that each distinct partition is considered exactly once. 
+# This dramatically reduces computation while producing the same set of possible splits, making it the standard approach for continuous features in production CART implementations.
+
+
+# Hence, let us apply midpoint approach on the same case of X = [1, 3, 5, 7]
+# For instance, we have unique_values = [1, 2, 3, 4] 
+# CART wants candidate split points between observed values, not on top of observed values. 
+# So, we want splits along : [1 | 2, 3, 4] -> 1.5 between 1 and 2, [1, 2 | 3, 4] -> 2.5 between 2 and 3, [1, 2, 3|4] -> 3.5 between 3 and 4. 
+# Hence, we do : unique_values[:-1] = [1, 2, 3] and unique_values[1:] = [2, 3, 4] 
+# Now, ([1, 2, 3] + [2, 3, 4])/2 = [3, 5, 7]/2 = [1.5, 2.5, 3.5] 
+# Hence, we can use : thresholds = (unique_values[:-1] + unique_values[1:]) / 2
+
+
 class TreeNode:
     """
     Represents a single node in the CART tree.
@@ -84,7 +108,8 @@ class RegressionTree:
             # For X and a chosen feature_idx, we want all rows of X, but only the column pertaining to feature_idx
             # So, we opt for X[:, feature_idx] , where feature_idx is the feature/column selector.
             feature_values = X[:, feature_idx]
-            # Get Candidate thresholds
+            # Get Candidate thresholds : 
+            # np.unique(feature_values) removes duplicates and returns the values in sorted order.
             unique_values = np.unique(feature_values)
             if len(unique_values) <= 1:
                 continue
