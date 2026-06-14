@@ -146,14 +146,6 @@ class CARTClassifier:
         """
         classes, counts = np.unique(y,return_counts=True)
         return classes[np.argmax(counts)]
-        
-def cart_classify(X_train, y_train, X_test, max_depth=5, min_samples=2):
-    """
-    Returns: list of predicted class labels for each test point
-    """
-    model = CARTClassifier(max_depth=max_depth,min_samples_split=min_samples)
-    model.fit(X_train,y_train)
-    return model.predict(X_test).tolist()
 
 class BaggingClassifier:
     """
@@ -169,7 +161,7 @@ class BaggingClassifier:
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.seed = seed
-
+        self.rng = np.random.RandomState(self.seed)
         self.trees = []
 
     def fit(self, X, y):
@@ -178,18 +170,17 @@ class BaggingClassifier:
         """
         X = np.asarray(X, dtype=float)
         y = np.asarray(y)
-        rng = np.random.RandomState(self.seed)
         self.trees = []
     
         for _ in range(self.n_estimators):
-            X_bootstrap, y_bootstrap = self.bootstrap_sample(X, y, rng)
+            X_bootstrap, y_bootstrap = self.bootstrap_sample(X, y)
             tree = CARTClassifier(max_depth=self.max_depth,min_samples_split=self.min_samples_split)
             tree.fit(X_bootstrap, y_bootstrap)
             self.trees.append(tree)
     
         return self
 
-    def bootstrap_sample(self, X, y, rng):
+    def bootstrap_sample(self, X, y):
         """
             Generate one bootstrap sample.
         Returns:
@@ -197,7 +188,7 @@ class BaggingClassifier:
         """
         n = len(X)
         # Sample n indices with replacement
-        bootstrap_indices = rng.randint(0, n, size=n)
+        bootstrap_indices = self.rng.randint(0, n, size=n)
         X_bootstrap = X[bootstrap_indices]
         y_bootstrap = y[bootstrap_indices]
         return X_bootstrap, y_bootstrap
@@ -243,7 +234,7 @@ def bagging_classify(X_train, y_train, X_test, n_estimators=10, max_depth=5, see
     """
     Returns: list of predicted class labels for each test point
     """
-    bc = BaggingClassifier(n_estimators=n_estimators,max_depth=max_depth,min_samples_split=2,seed=seed)
-    bc.fit(X_train, y_train)
-    return bc.predict(X_test)
+    bagging_classifier = BaggingClassifier(n_estimators=n_estimators,max_depth=max_depth,min_samples_split=2,seed=seed)
+    bagging_classifier.fit(X_train, y_train)
+    return bagging_classifier.predict(X_test)
     
