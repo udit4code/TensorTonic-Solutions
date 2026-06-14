@@ -1,5 +1,56 @@
 import numpy as np
 
+# MOTIVATION : Why do we need a bagging classifier ? 
+# In the world of only 1 decision tree, the flow is : Training Data -> Decision Tree -> Predictions.
+# But, Decision trees have a major weakness: Small changes in training data can produce very different trees.
+# So, they are very much sensitive to minor changes in the dataset and hence, they show high variance.
+# A tiny data change produced a different model.This phenomenon is called high variance.
+
+# So, how do we make our decision trees less sensitive to minor changes in training data ?
+# We use bagging, where the central idea is based on the flow -> different training datasets -> different decision trees -> final conclusion based on a consensus (majority vote)among decisions made by all trees.
+# This is based on the intuition that : One tree gives us only one opinion, but many trees can be thought of as a committee, which gives an overall decision based on opinions of individual trees. 
+
+# But, where do we get so many training datasets for bagging ? 
+# For this, we use bootstrap sampling, where given an existing training dataset, we create a new dataset by sampling WITH replacement.
+# Eg : [A B C D E] -> [A B B C E] (where D is missing), [A A D D E] (where B, C are missing), [C C D E E] (where A, B are missing) 
+# As we can see, some rows are repeated, while some rows are missing. The missing rows are called Out-of-bag-samples. Out-of-Bag (OOB) samples are one of the nicest side effects of bootstrap sampling.
+# Since sampling is done with replacement for a given tree, some rows are repeated while some rows are missed. The unselected rows (which are missed) are known as out-of-bag samples.
+# Say, there are 1 rows and there is equal probability of drawing 1 row.
+# So, for a given row, the probability that it is not chosen in one draw = 1 - 1/n
+# Now, for n draws, this probability multiplies -> (1 - 1/n)^n, which approaches towards 1/e = 0.368
+# So, we can say that 36.8% samples are OOB and 63.2% samples appear in bootstrap set.
+# Why is this useful?
+# For Tree #1: Training data = Bootstrap sample
+# OOB samples were never seen by Tree #1.
+# Therefore: OOB samples act like test samples for that tree.
+# Now, when we evaluate Tree #1 against its OOB samples, it gives an unbiased estimate of how Tree #1 performs on unseen data.
+# Why is this awesome ? Normally, we split data into training_set and test_set. From training set, we carve out a validation_set.
+# In case of bagging, we can use all samples for training and still estimate generalization error using OOB predictions. So, No separate validation set required.
+# So, in practice, if we're already bootstrapping, we  an estimate validation accuracy without a validation set, by using Out-of-bag samples. Simply put, OOB samples are training rows that were not selected into a particular bootstrap sample, and they provide a nearly free estimate of generalization performance without needing a separate validation dataset.
+
+
+# Now, what we do is we train one tree per bootstrap example. 
+# So, every tree sees a slightly different view of training data.
+# Tree1 ≠ Tree2 ≠ Tree3. This is what we want : trees should not be equal to each other, so that they generate variety of opinions during inference.
+# Pictorially, we can depict it as : 
+# Original Dataset
+# │
+# ├──── Bootstrap #1 → Tree1
+# │
+# ├──── Bootstrap #2 → Tree2
+# │
+# ├──── Bootstrap #3 → Tree3
+# │
+# └──── Bootstrap #100 → Tree100
+
+# Why does bagging reduce variance ?
+# In a simple world, where each tree is independent of each other, assume that each tree has a variance of v. Now, on average, the variance will be v/n, which is way less than v. 
+# In practice, trees are correlated, so reduction isn't that dramatic, but it is still significant.
+# Hence, Bagging works best when base models have High Variance (as seen in Deep Decision Trees).
+
+
+
+
 class TreeNode:
     """
         Represents a single node in the CART tree.
