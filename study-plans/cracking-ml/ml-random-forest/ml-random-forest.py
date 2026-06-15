@@ -1,5 +1,58 @@
 import numpy as np
 
+# INTUITION : Why do we move from bagging (where we bootstrap samples with replacement) to random forests(where we do both bagging as well as randomized feature selection during splits) ?
+
+# A short answer often cited in blogs : "Random Forest decorrelates trees."
+# But, then the obvious question is : Why does decorrelation help mathematically ?
+
+# Say, via bootstrapping by replacement, we generate slightly different datasets -> D_1, D_2, D_3, D_4, ....
+# For each dataset D_i, we generate a corresponding Tree T_i. 
+# Now, because these trees are different, there is a high chance that the prediction by each tree might be different.
+# So, we get inherent instability in making predictions and hence, we use majority voting to arrive at the final overall prediction. This instability is called variance.
+# Mathematically, Prediction Error = Bias² + Variance + Noise
+# Decision Trees already have low bias, because they make very few strict assumptions about the underlying structure of the data. 
+# Instead of forcing data into a rigid shape (like a straight line in linear regression), they dynamically partition the feature space into flexible, localized regions to fit the training data perfectly.
+# Moreover, the Noise can't be reduced. 
+# So, via bagging, we reduce variance by a huge factor.
+# How ? Assuming each tree is independent, overall variance = v/M <<<< v, where v = variance of individual tree and M is number of trees.
+# But, here, we end up making a big assumption : Each Tree is independent of the other.
+
+# In practice, this assumption is broken. For example, in the housing problem, Income tends to be the major feature.
+# Now, every bootstrap sample contains roughly 63% of rows and each of these rows has Income feature. 
+# But because income is a strong feature, so every tree often ends up chosing income as the root node for split, as 
+# a bootstrapped sample continues to have 63% rows , each having the Income feature.
+# Then, in this case, the errors become highly correlated across the trees.
+# So, the hidden assumption that trees are independent gets broken.
+
+# Now, Breiman's formula for variance of an ensemble of trees = ρσ² + (1-ρ)σ²/M
+# where, Variance of each Tree is roughly σ² and pair-wise correlation among trees is ρ (This is a simplifying assumption again).
+
+# When ρ = 1, then, variance of ensemble = σ², which is as good as having a single Decision Tree. 
+# So, when trees are strongly correlated, then, bagging is not enough, as variance of ensemble is as good as that of a single tree. Why waste resources on an ensemble with no benefit ???? -> Motivation behind moving from bagging to random forest.
+
+# When ρ = 0, then, each tree is independent, and we get the best-case scenario (which is already discussed).
+
+# The goal of random forest is to reduce ρ , which in practice, translates to making the trees as less correlated as possible.
+
+# With random forests, we end up in a situation where the dominant features may not be considered for split.
+# For example, for features [f_1, f_2, f_3, f_4, f_5, f_6] where f_3, and f_5 are dominant, we can end up with 
+# subsets  such as {f_1, f_2, f_4} and {f_2, f_4, f_6} and in both these cases, the root split won't be dominated
+# by the dominant features. Hence, in these cases, the individual trees are forced to discover the second-best predictor, Third-best predictor, Fourth-best predictor and so on. 
+# Therefore, the trees become very different and hence, un-correlated. 
+# So, even though the individual tree quality drops (thereby, a slight increase in bias), the overall ensemble variance
+# decreases massively because trees become more and more diverse.
+# This is the central Random Forest tradeoff.
+
+# Breiman essentially argued : Generalization Error depends on Strength of each tree (bias) and Correlation between trees (variance).
+# Random Forest intentionally sacrifices a little tree strength to massively reduce correlation.
+
+# SUMMARY : 
+# 1. Bagging reduces variance by averaging.
+# 2. Random feature selection makes averaging effective by reducing correlation between trees.
+# 3. That single equation is the deepest mathematical reason Random Forests outperform plain bagged decision trees.
+
+
+
 class TreeNode:
     """
         Represents a single node in the CART tree.
