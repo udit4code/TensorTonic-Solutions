@@ -58,7 +58,6 @@ def classification_metrics(y_true, y_pred, average="micro", pos_label=1):
 
         pos_idx = np.where(labels == pos_label)[0][0]
         precision = tp[pos_idx] / (tp[pos_idx] + fp[pos_idx] + eps)
-
         recall = tp[pos_idx] / (tp[pos_idx] + fn[pos_idx] + eps)
 
         f1 = (2 * precision * recall / (precision + recall + eps))
@@ -84,12 +83,9 @@ def classification_metrics(y_true, y_pred, average="micro", pos_label=1):
         precision_per_class = tp / (tp + fp + eps)
         recall_per_class = tp / (tp + fn + eps)
         f1_per_class = (2 * precision_per_class * recall_per_class / (precision_per_class + recall_per_class + eps))
-        precision = np.average(precision_per_class,weights=support,)
-
-        recall = np.average(recall_per_class,weights=support,)
-
-        f1 = np.average(f1_per_class,weights=support,)
-
+        precision = np.average(precision_per_class,weights=support)
+        recall = np.average(recall_per_class,weights=support)
+        f1 = np.average(f1_per_class,weights=support)
     else:
         raise ValueError(
             "average must be one of "
