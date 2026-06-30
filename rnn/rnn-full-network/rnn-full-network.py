@@ -32,3 +32,68 @@ class VanillaRNN:
             y_seq[:, t, :] = y
 
         return y_seq, h
+
+    def backward(self, dY: np.ndarray):
+        """
+        Backpropagation Through Time (BPTT).
+    
+        Args:
+            dY: Gradient of loss w.r.t. outputs.
+                Shape: (batch, T, output_dim)
+    
+        Returns:
+            Dictionary containing parameter gradients.
+        """
+    
+        batch_size, T, _ = dY.shape
+    
+        # Step 0 : Initialize parameter gradients
+        dW_xh = np.zeros_like(self.W_xh)
+        dW_hh = np.zeros_like(self.W_hh)
+        dW_hy = np.zeros_like(self.W_hy)
+    
+        db_h = np.zeros_like(self.b_h)
+        db_y = np.zeros_like(self.b_y)
+    
+        # Step 1 : Gradient flowing backward through time
+        dh_next = np.zeros((batch_size, self.hidden_dim))
+    
+        # Step 2 : Loop backwards through time
+        for t in reversed(range(T)):
+    
+            h_t = self.hidden_states[:, t, :]
+            x_t = self.X[:, t, :]
+    
+            if t == 0:
+                h_prev = self.h0
+            else:
+                h_prev = self.hidden_states[:, t - 1, :]
+    
+            # Output layer
+            dy = dY[:, t, :]
+    
+            dW_hy += dy.T @ h_t
+            db_y += np.sum(dy, axis=0)
+    
+            # Gradient arriving at hidden state
+            dh = dy @ self.W_hy + dh_next
+    
+            # tanh derivative
+            da = dh * (1 - h_t ** 2)
+    
+            # Hidden layer gradients
+            dW_xh += da.T @ x_t
+            dW_hh += da.T @ h_prev
+    
+            db_h += np.sum(da, axis=0)
+    
+            # Propagate to previous timestep
+            dh_next = da @ self.W_hh
+    
+        return {
+            "W_xh": dW_xh,
+            "W_hh": dW_hh,
+            "W_hy": dW_hy,
+            "b_h": db_h,
+            "b_y": db_y,
+        }
