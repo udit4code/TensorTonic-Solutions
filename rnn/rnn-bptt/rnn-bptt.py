@@ -23,9 +23,6 @@ def bptt_single_step(dh_next: np.ndarray,
     """
 
     da = dh_next * (1 - h_t ** 2)
-
     dh_prev = da @ W_hh
-
     dW_hh = da.T @ h_prev
-
     return dh_prev, dW_hh
