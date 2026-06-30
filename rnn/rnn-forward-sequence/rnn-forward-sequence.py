@@ -1,25 +1,17 @@
 import numpy as np
 
-import numpy as np
-
-def rnn_forward(X: np.ndarray,
-                h_0: np.ndarray,
-                W_xh: np.ndarray,
-                W_hh: np.ndarray,
-                b_h: np.ndarray):
+def rnn_forward(X: np.ndarray,h_0: np.ndarray,W_xh: np.ndarray,W_hh: np.ndarray,b_h: np.ndarray):
     """
-    Forward pass through a vanilla RNN.
-
-    Args:
-        X:      (batch, T, input_dim)
-        h_0:    (batch, hidden_dim)
-        W_xh:   (input_dim, hidden_dim)
-        W_hh:   (hidden_dim, hidden_dim)
-        b_h:    (hidden_dim,)
-
-    Returns:
-        hidden_states: (batch, T, hidden_dim)
-        h_final:       (batch, hidden_dim)
+        Forward pass through a vanilla RNN.
+        Args:
+            X:      (batch, T, input_dim)
+            h_0:    (batch, hidden_dim)
+            W_xh:   (input_dim, hidden_dim)
+            W_hh:   (hidden_dim, hidden_dim)
+            b_h:    (hidden_dim,)
+        Returns:
+            hidden_states: (batch, T, hidden_dim)
+            h_final:       (batch, hidden_dim)
     """
     batch_size, T, _ = X.shape
     hidden_dim = h_0.shape[1]
