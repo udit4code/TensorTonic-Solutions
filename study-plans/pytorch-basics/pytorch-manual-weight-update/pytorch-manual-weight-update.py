@@ -8,7 +8,13 @@ def manual_train_step(model, X, y, criterion, lr):
     """
         Returns: loss value as a Python float
     """
-    # Put model in training mode
+    # Put model in training mode. 
+    # Its purpose is to tell certain layers inside the model to behave in training mode instead of evaluation mode.  
+    # Internally, it sets model.training = True and hence, every submodule also gets layer.training = True 
+    # This is important, if Dropout and Batch-Normalisation are involved as layers in the model architecture.
+    # During forward pass, Dropout randomly turns off neurons.
+    # So, as a result, Every forward pass looks different. This helps prevent overfitting.
+    # During training, BatchNorm computes running batch mean and batch variance from the current mini-batch. 
     model.train()
     # Forward pass
     predictions = model(X)
