@@ -1,6 +1,12 @@
 import torch.nn as nn
 import torch
 
+# Why is validation loss used instead of training loss?
+
+# Training loss almost always decreases because the model is optimizing directly for it. 
+# Validation loss reflects performance on unseen data and is therefore a much better indicator of whether the model is still generalizing or has started to overfit. 
+# Early stopping uses validation loss to halt training before overfitting becomes severe.
+
 def train_with_early_stopping(model, train_loader, val_loader,
                               criterion, optimizer,
                               max_epochs, patience):
