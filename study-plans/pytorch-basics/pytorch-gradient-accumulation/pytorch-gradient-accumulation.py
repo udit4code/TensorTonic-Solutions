@@ -20,6 +20,7 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
     accumulated_grad = torch.zeros_like(w)
     last_avg_grad = None
 
+    
     for i, (x, y) in enumerate(micro_batches):
         x = torch.tensor(x, dtype=torch.float32)
         y = torch.tensor(y, dtype=torch.float32)
@@ -37,8 +38,10 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
         if (i + 1) % accum_steps == 0:
             avg_grad = accumulated_grad / accum_steps
             last_avg_grad = avg_grad.clone()
+            # We use torch.no_grad() because the optimizer update 
+            # is not part of the neural network computation that we want to differentiate through.
             with torch.no_grad():
                 w -= lr * avg_grad
             accumulated_grad.zero_()
             
-    return w.tolist(), last_avg_grad.tolist()
+    return w.detach().tolist(), last_avg_grad.tolist()
