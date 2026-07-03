@@ -40,8 +40,11 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
             last_avg_grad = avg_grad.clone()
             # We use torch.no_grad() because the optimizer update 
             # is not part of the neural network computation that we want to differentiate through.
+            # It tells PyTorch : "Under this block, just update the numbers and do not build a computation graph"
             with torch.no_grad():
                 w -= lr * avg_grad
+            # Doubt : When we do optimizer.step(), why don't we put it inside a no_grad block ? 
+            # Because, PyTorch's optimizers already perform parameter updates inside a no-gradient context internally. 
             accumulated_grad.zero_()
             
     return w.detach().tolist(), last_avg_grad.tolist()
