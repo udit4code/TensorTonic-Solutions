@@ -1,6 +1,4 @@
-import torch
 import torch.nn as nn
-
 import torch
 
 def train_with_early_stopping(model, train_loader, val_loader,
