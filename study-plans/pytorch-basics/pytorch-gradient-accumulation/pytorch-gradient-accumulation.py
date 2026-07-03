@@ -29,9 +29,8 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
         if (i + 1) % accum_steps == 0:
             avg_grad = accumulated_grad / accum_steps
             last_avg_grad = avg_grad.clone()
-
             with torch.no_grad():
                 w -= lr * avg_grad
-
             accumulated_grad.zero_()
+            
     return w.tolist(), last_avg_grad.tolist()
