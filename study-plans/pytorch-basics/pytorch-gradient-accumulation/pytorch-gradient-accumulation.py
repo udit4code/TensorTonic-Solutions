@@ -1,9 +1,12 @@
 import torch
 
 
-# The key intuition is that gradient accumulation delays the optimizer step. You still compute a gradient for every micro-batch, but you treat several micro-batches as if they formed one larger batch by summing (and then averaging) their gradients before performing a single weight update. This lets you simulate a larger batch size without needing enough memory to process all those samples at once.
+# The key intuition is that gradient accumulation delays the optimizer step.
+# We still compute a gradient for every micro-batch, but we treat several micro-batches as if they formed one larger batch by summing (and then averaging) their gradients before performing a single weight update. This lets us simulate a larger batch size without needing enough memory to process all those samples at once.
 
-# Gradient accumulation is extremely common in real-world deep learning. It's not a niche trick—it exists because GPU memory is limited. Whenever your desired batch size doesn't fit into GPU memory, gradient accumulation is often the first solution.
+# Gradient accumulation is extremely common in real-world deep learning. It's not a niche trick—it exists because GPU memory is limited. Whenever our desired batch size doesn't fit into GPU memory, gradient accumulation is often the first solution.
+
+
     
 def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
     """
