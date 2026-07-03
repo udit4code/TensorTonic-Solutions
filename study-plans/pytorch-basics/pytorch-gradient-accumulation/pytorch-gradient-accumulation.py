@@ -25,7 +25,6 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
         accumulated_grad += w.grad
         # Clear gradients for next micro-batch
         w.grad.zero_()
-
         # Update after accum_steps micro-batches
         if (i + 1) % accum_steps == 0:
             avg_grad = accumulated_grad / accum_steps
@@ -35,7 +34,4 @@ def gradient_accumulation(w_init, micro_batches, lr, accum_steps):
                 w -= lr * avg_grad
 
             accumulated_grad.zero_()
-    return (
-        [v for v in w.tolist()],
-        [v for v in last_avg_grad.tolist()],
-    )
+    return w.tolist(), last_avg_grad.tolist()
