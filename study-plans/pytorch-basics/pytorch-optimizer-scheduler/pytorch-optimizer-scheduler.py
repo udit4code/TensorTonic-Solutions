@@ -22,7 +22,6 @@ def train_with_scheduler(model, dataloader, criterion, optimizer, scheduler, num
             loss = criterion(predictions, y)
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
 
         avg_loss = running_loss / len(dataloader)
