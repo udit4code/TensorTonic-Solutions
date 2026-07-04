@@ -20,8 +20,8 @@ def scaled_dot_product_attention(Q, K, V):
     # Without scaling, the dot products can become very large
     # when d_k is large, causing the softmax to become extremely
     # peaked and resulting in very small gradients.
-    d_k = Q.size(-1)
-    scores = scores / math.sqrt(d_k)
+    d_k = torch.tensor(Q.size(-1))
+    scores = scores / torch.sqrt(d_k)
     # Step 3 : 
     # Convert the scores into attention weights.
     # Softmax is applied over the key dimension so that each
