@@ -14,6 +14,9 @@ def scaled_dot_product_attention(Q, K, V):
     # Step 1 :
     # Compute attention scores by measuring how similar every query is to every key.
     # Shape: (..., seq_len_q, seq_len_k)
+    # Why not K.T ? Because, we want to do transpose only over the last 2 dimensions. 
+    # So, if Q's shape is (batch, heads, seq_len, d_k) and K's shape is (batch, heads, seq_len, d_k) 
+    # Then, we want transpose of K to be of shape (batch, heads, d_k, seq_len)
     scores = Q @ K.transpose(-2, -1)
     # Step 2 :
     # Scale the scores by sqrt(d_k).
