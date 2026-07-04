@@ -24,12 +24,8 @@ class MultiHeadAttention(nn.Module):
         self.head_dim = d_model // num_heads
 
         # Learnable projection matrices.
-        # Each has shape:
-        # (d_model, d_model)
-        #
-        # They project the input embeddings into
-        # Query, Key, Value and Output spaces.
-        ###########################################################
+        # Each has shape: (d_model, d_model)
+        # They project the input embeddings into Query, Key, Value and Output spaces.
 
         self.W_q = nn.Parameter(torch.randn(d_model, d_model))
         self.W_k = nn.Parameter(torch.randn(d_model, d_model))
