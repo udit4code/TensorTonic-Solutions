@@ -36,8 +36,7 @@ class CustomSGD(torch.optim.Optimizer):
                     if p.grad is None:
                         continue
                     grad = p.grad
-                    # Obtain the optimizer state associated with
-                    # this parameter.
+                    # Obtain the optimizer state associated with this parameter.
                     state = self.state[p]
                     # Initialize the momentum buffer on the first step.
                     if "momentum_buffer" not in state:
