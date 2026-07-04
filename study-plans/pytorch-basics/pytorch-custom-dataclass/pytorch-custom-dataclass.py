@@ -10,6 +10,8 @@ class CSVDataset(Dataset):
         data_tensor = torch.tensor(data, dtype=torch.float32)
         feature_cols = [idx for idx in range(data_tensor.shape[1]) if idx != label_col]
         self.features = data_tensor[:, feature_cols]
+        # unsqueeze() inserts a new dimension of size 1 at the specified position.
+        # Why ? Because we expect labels to be of the shape (N,1) instead of (N,)
         self.labels = data_tensor[:, label_col].unsqueeze(1)
         assert  len(self.features) == len(self.labels), "Mismatch in count of features and labels"
         
