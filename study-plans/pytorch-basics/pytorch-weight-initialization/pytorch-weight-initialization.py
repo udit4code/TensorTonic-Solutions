@@ -1,29 +1,20 @@
 import torch
-import torch.nn as nn
 
 def initialize_weights(fan_in, fan_out, method):
-    """
-    Returns:
-        Tensor of shape (fan_out, fan_in) initialized using
-        the specified method.
-    """
-
-    # Create an empty weight tensor.
     weights = torch.empty(fan_out, fan_in)
-
     if method == "xavier_uniform":
-        nn.init.xavier_uniform_(weights)
-
+        a = (6.0 / (fan_in + fan_out)) ** 0.5
+        weights.uniform_(-a, a)
     elif method == "xavier_normal":
-        nn.init.xavier_normal_(weights)
-
+        std = (2.0 / (fan_in + fan_out)) ** 0.5
+        weights.normal_(0.0, std)
     elif method == "he_uniform":
-        nn.init.kaiming_uniform_(weights, mode="fan_in", nonlinearity="relu")
-
+        a = (6.0 / fan_in) ** 0.5
+        weights.uniform_(-a, a)
     elif method == "he_normal":
-        nn.init.kaiming_normal_(weights, mode="fan_in", nonlinearity="relu")
-
+        std = (2.0 / fan_in) ** 0.5
+        weights.normal_(0.0, std)
     else:
-        raise ValueError(f"Unknown initialization method: {method}")
+        raise ValueError("Unknown initialization method")
 
     return weights
