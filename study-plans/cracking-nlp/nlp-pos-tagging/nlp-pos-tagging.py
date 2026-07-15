@@ -18,10 +18,10 @@ def pos_tagging(train, test, default_tag="NN"):
     model_artifact = {}
     for word in word_to_tag_count_map:
         count_map = word_to_tag_count_map[word]
-        # Sort on the basis of decreasing count and lexicographical order of tag
-        result = sorted(count_map.items(), key=lambda item: (-item[1], item[0]))
+        # Get the best tag on the basis of decreasing count and lexicographical order.
+        best_tag = max(count_map.items(), key=lambda item: (item[1], -ord(item[0][0])))
         # Extract the tag
-        model_artifact[word] = result[0][0]
+        model_artifact[word] = best_tag[0]
     # Step 3 : Do inference on test set from model_artifact
     result = [ ]
     for sentence in test:
