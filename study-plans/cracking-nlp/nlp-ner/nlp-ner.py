@@ -1,15 +1,21 @@
 def named_entity_recognition(sentences, entity_dict):
     """
-    Returns: list
+    Args:
+        sentences: List[List[str]]
+        entity_dict: Dict[str, str]
+
+    Returns:
+        List[List[str]]
     """
-    result = [ ]
     otherwise_tag = "O"
-    for sentence in sentences:
-        ner_tagged_output = [ ]
+
+    def get_ner_tagged_sentence(sentence):
+        ner_tagged_output = []
         for word in sentence:
-            if word not in entity_dict:
-                ner_tagged_output.append(otherwise_tag)
-            else:
+            if word in entity_dict:
                 ner_tagged_output.append(entity_dict[word])
-        result.append(ner_tagged_output)
-    return result 
+            else:
+                ner_tagged_output.append(otherwise_tag)
+        return ner_tagged_output
+
+    return list(map(get_ner_tagged_sentence, sentences))
