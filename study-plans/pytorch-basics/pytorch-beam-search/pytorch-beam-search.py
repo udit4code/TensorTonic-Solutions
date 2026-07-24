@@ -1,3 +1,4 @@
+
 def beam_search(log_probs_fn, start_token, end_token, beam_width, max_len):
     """
     Returns: list of token IDs
