@@ -22,6 +22,7 @@ def fma_kernel(x_ptr, y_ptr, out_ptr, n, a, BLOCK_SIZE: tl.constexpr):
 
     # Step 5 : Do the Addition computation in 1 shot on the GPU register. 
     # Registers are private per thread (program instance); shared memory is shared per thread block. 
+    # Express the operation as a single fused a⋅x+y so Triton emits a hardware FMA
     out_vals = a * x_vals + y_vals
 
     # Step 6 : Write back the result from the register to the HBM for the current thread/program instance. 
