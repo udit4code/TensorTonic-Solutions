@@ -11,4 +11,4 @@ def dot_product(x: list, y: list) -> float:
     # Step 3 : Do a matrix multiplication np_x @ np_y.T [(1,d) @ (d, 1)] and then, reduce it over the axis 0
     output = np.sum(np_x @ np_y.T, axis=0)
 
-    return output.item()
+    return float(output.item())
