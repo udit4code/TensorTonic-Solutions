@@ -7,7 +7,8 @@ def batch_norm_forward(x: list, gamma: list, beta: list, eps: float = 1e-5) -> n
     np_gamma = np.asarray(gamma, dtype=np.float64)
     np_beta = np.asarray(beta, dtype=np.float64)
     normalized = None 
-    # Step 1 : Decide the axes for reduction 
+    # Step 1 : Decide the axes for reduction  
+    # gamma and beta have one parameter per feature/channel. We reshape them by inserting dimensions of size 1 everywhere we want NumPy broadcasting to repeat that parameter.
     if np_x.ndim == 2:
         # Case 1 : If shape of np_x is (N, D)
         # BatchNorm has 1 gamma and 1 beta for every feature. 
