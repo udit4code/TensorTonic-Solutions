@@ -40,7 +40,9 @@ def mean_var_kernel(x_ptr, sum_ptr, sumsq_ptr, n, BLOCK_SIZE: tl.constexpr):
 # KEY TAKEAWAY : Python Code runs on the CPU. Operations involving CUDA tensors are scheduled for the GPU. 
 # The CPU usually does not wait for the output of every GPU operation. 
 # CPU places operations into a CUDA stream in a given order : zero-buffers -> run mean_var_kernel -> compute mean -> compute variance -> copy outputs. 
-# CUDA preserves this ordering within the same stream. 
+# CUDA preserves this ordering within the same stream.
+
+# What is a CUDA stream ? We can think of it as a queue of instructions for the GPU. The CPU places GPU tasks into this queue, so that the GPU can process them in a fixed order. Meanwhile, after adding each task, the CPU does not necessarily wait for each GPU task to end. It can continue running python code while the GPU works through the queue. 
 
     
 def solve(x: torch.Tensor, mean_out: torch.Tensor, var_out: torch.Tensor) -> None:
