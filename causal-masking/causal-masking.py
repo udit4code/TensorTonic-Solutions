@@ -21,4 +21,12 @@ def apply_causal_mask(scores: list, mask_value: float = -1e9) -> np.ndarray:
     j = np.arange(T)[None, :]
     mask = j > i 
     # Step 2 : Get masked scores 
+    # np.where(condition_mask, x, y) : We can think of it as an element-wise if-else statement. 
+    # That is, for a given position, if condition_mask is True, then, pick x, else pick y . 
+    # For every position {
+    #     if mask[position] == True: 
+    #         output[position] = mask_value
+    #     else:
+    #         output[position] = scores[position]
+    # }
     return np.where(mask, mask_value, scores)
