@@ -7,11 +7,6 @@ import math
 # via the dataclasses module that provides a decorator to automatically generate special boilerplate methods 
 # (like __init__(), __repr__(), and __eq__()) for classes that primarily exist to store data. 
 
-import numpy as np
-from dataclasses import dataclass
-from typing import Optional
-import math
-
 
 @dataclass
 class IsolationTreeNode:
