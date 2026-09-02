@@ -3,12 +3,10 @@ from typing import Optional
 
 def softmax_from_scratch(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     # Step 1: subtract max for numerical stability
-    max_vals = x.max(dim=dim, keepdim=True).values
+    max_vals = torch.max(x, dim=dim, keepdim=True).values
     shifted = x - max_vals
-
     # Step 2: exponentiate
     exp_vals = torch.exp(shifted)
-
     # Step 3: normalize
     denominator = exp_vals.sum(dim=dim, keepdim=True)
 
