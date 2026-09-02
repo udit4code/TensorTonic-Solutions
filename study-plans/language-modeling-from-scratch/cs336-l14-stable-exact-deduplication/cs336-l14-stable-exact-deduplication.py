@@ -49,15 +49,18 @@ def stable_exact_deduplication(documents, lowercase=True,
         # Step 1 : Get the digest of the document
         normalized_text, digest = get_document_digest(document, lowercase, collapse_whitespace, hash_bits)
         owner = None  
+        # Step 2 : If document digest is found in the bucket, then, find the first retained_text that matches with the normalized text of the current document
         if digest in buckets:
             for retained_text, retained_id  in buckets[digest]:
                 if retained_text == normalized_text:
                     owner = retained_id 
                     break  
         if owner is None: 
+            # It means, that the current document has no matching digest and hence, we need to create a new bucket exclusively with the new digest as the search key. 
             retained_ids.append(document["id"])
             buckets.setdefault(digest, []).append((normalized_text, document["id"]))
         else:
+            # Otherwise, we can safely say that current document has a matching document with same digest and hence, we can set its parent/owner to the already added matching document. 
             removed_to_retained[document["id"]] = owner
     return {
         "retained_ids" : retained_ids,
