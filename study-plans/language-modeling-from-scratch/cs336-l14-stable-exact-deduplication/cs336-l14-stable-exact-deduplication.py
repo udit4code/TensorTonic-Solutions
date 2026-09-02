@@ -66,3 +66,10 @@ def stable_exact_deduplication(documents, lowercase=True,
         "retained_ids" : retained_ids,
         "removed_to_retained" : removed_to_retained
     }
+
+
+# Stable exact document deduplication is commonly done during dataset/data-pipeline preprocessing, especially before training language models, building search indexes, or creating RAG corpora. For example, if we're preparing 100 million web pages for LLM pretraining, the same article may have been crawled multiple times or appear under different URLs. 
+# We normalize each document and deduplicate it so the model doesn't repeatedly train on identical content. Similarly, before indexing documents into Elasticsearch/vector databases for search or RAG, exact dedup prevents storing and retrieving redundant copies.
+
+# The stable part means that when duplicates occur, we deterministically keep the first occurrence and map later duplicates back to it: doc_17 → retained, doc_92 → doc_17, doc_501 → doc_17. This is useful in reproducible ETL/ML pipelines because running the same ordered dataset through the pipeline gives the same retained documents and preserves provenance — we know exactly which document survived and which documents were removed as its duplicates.
+
