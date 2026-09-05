@@ -12,7 +12,12 @@ def softmax(x: list) -> np.ndarray:
         exp_values = np.exp(shifted)
         sum = np.sum(exp_values)
         return exp_values / sum
-    # Step 2 : Compute max of x along the last dimension 
+    # Step 2 : Compute max of x  
+    # axis=1 means apply Softmax along each row for a 2D array. 
+    # if x.shape is (2, 3), then, it means it has 2 rows and 3 columns.
+    # Now, np.max(x, axis=1) means that it takes the max across columns (across axis=1) for each row. 
+    # keepdims=True preserves the reduced dimension, so that shape of max_x is (2, 1) instead of (2,).
+    # This helps in broadcasting in later stages.
     max_x = np.max(x, axis=1, keepdims=True)
     # Step 3 : Shift x by max_x
     shifted_x = x - max_x
