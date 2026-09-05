@@ -5,9 +5,13 @@ def safe_softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     # Because torch.max(x, dim=dim, keepdim=True) returns two things: values and indices.
     # values, indices = torch.max(x, dim=dim, keepdim=True) .  
     # The values are the actual maximum numbers; the indices tell you where those maxima occurred.
+    # Step 1 : Find maximum value along the softmax dimension
     max_x = torch.max(x, dim=dim, keepdim=True).values
+    # Step 2 : Shift values so the largest value becomes 0
     shifted_x = x - max_x
+    # Step 3 : Exponentiate
     exp_x = torch.exp(shifted_x)
+    # Step 4 :  Sum exponentials 
     sum_exp_x = torch.sum(exp_x, dim=dim, keepdim=True)
     return exp_x / sum_exp_x
 
