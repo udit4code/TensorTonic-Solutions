@@ -1,5 +1,26 @@
 import torch
 
+
+def repeat_kv_from_scratch(x: torch.Tensor,num_query_heads: int) -> torch.Tensor:
+    """
+        x: (B, num_kv_heads, T, d_h)
+    
+        Returns:
+            (B, num_query_heads, T, d_h)
+    """
+    batch_size, num_kv_heads, seq_len, head_dim = x.shape
+    assert num_kv_heads > 0, f"num_kv_heads : {num_kv_heads}"
+    assert num_query_heads % num_kv_heads == 0  , f"num_query_heads {num_query_heads} not divisible by num_kv_heads {num_kv_heads}"
+
+    queries_per_kv_head = num_query_heads // num_kv_heads
+    output = torch.empty(batch_size, num_query_heads, seq_len, head_dim, device=x.device, dtype=x.dtype)
+
+    for query_head in range(num_query_heads):
+        kv_head = query_head // queries_per_kv_head
+        output[:, query_head, :, :] = x[:, kv_head, :, :]
+
+    return output
+    
 def grouped_query_attention(
     hidden_states: torch.Tensor,
     w_q: torch.Tensor,
@@ -66,8 +87,10 @@ def grouped_query_attention(
     # for kv_head in K along dim=1:
     #     for _ in range(queries_per_kv_head):
     #         result.append(kv_head)
-    K = K.repeat_interleave(queries_per_kv_head,dim=1)
-    V = V.repeat_interleave(queries_per_kv_head,dim=1)
+    # K = K.repeat_interleave(queries_per_kv_head,dim=1)
+    K = repeat_kv_from_scratch(K, num_query_heads)
+    # V = V.repeat_interleave(queries_per_kv_head,dim=1)
+    V = repeat_kv_from_scratch(V, num_query_heads)
 
     # Step 4: Compute Attention scores
     # Shape of scores = (B, H_q, T, d_h) @ (B, H_q, d_h, T) = (B, H_q, T, T)
