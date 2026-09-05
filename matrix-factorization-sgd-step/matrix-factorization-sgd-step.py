@@ -15,4 +15,7 @@ def matrix_factorization_sgd_step(U: list, V: list, r: float, lr: float, reg: fl
     U_new = U + lr * (e * V - reg * U)
     V_new = V + lr * (e * U - reg * V)
 
-    return [[round(float(x), 4) for x in U_new], [round(float(x), 4) for x in V_new]]
+    return [
+        U_new.round(4).tolist(),
+        V_new.round(4).tolist(),
+    ]
