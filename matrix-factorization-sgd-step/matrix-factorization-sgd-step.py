@@ -9,7 +9,7 @@ def matrix_factorization_sgd_step(U: list, V: list, r: float, lr: float, reg: fl
     V = np.asarray(V, dtype=np.float64)
     # Step 2 : Compute dot product of U and V.
     dot_product = U @ V.T 
-    # Step 3 : Compute e 
+    # Step 3 : Compute prediction error 
     e = r - dot_product 
     # Step 4 : Update U and V 
     U_new = U + lr * (e * V - reg * U)
