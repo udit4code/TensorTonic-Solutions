@@ -22,16 +22,10 @@ def grouped_query_attention(
     # num_kv_heads is effectively the number of query-head groups.
     batch_size, seq_len, d_model = hidden_states.shape
     if d_model % num_query_heads != 0:
-        raise ValueError(
-            f"d_model ({d_model}) must be divisible by "
-            f"num_query_heads ({num_query_heads})"
-        )
+        raise ValueError(f"d_model ({d_model}) must be divisible by num_query_heads ({num_query_heads})")
 
     if num_query_heads % num_kv_heads != 0:
-        raise ValueError(
-            f"num_query_heads ({num_query_heads}) must be divisible by "
-            f"num_kv_heads ({num_kv_heads})"
-        )
+        raise ValueError(f"num_query_heads ({num_query_heads}) must be divisible by num_kv_heads ({num_kv_heads})")
 
     # head_dim points to d_h
     head_dim = d_model // num_query_heads
