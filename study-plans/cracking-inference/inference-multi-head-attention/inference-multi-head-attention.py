@@ -70,7 +70,7 @@ def multi_head_attention(
         # row 2   F      F      F      T
         # row 3   F      F      F      F
         # Hence, PyTorch broadcasts them to a (4, 4) comparison. 
-        mask = col_idx > row_idx
+        mask = row_idx < col_idx
         # torch.where(mask, -inf, scores) means: wherever the mask is True, replace that attention score with -inf; otherwise keep the original score. 
         # After softmax, those -inf positions get probability 0
         scores = torch.where(
