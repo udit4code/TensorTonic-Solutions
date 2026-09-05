@@ -1,5 +1,17 @@
 import torch
 
+
+def safe_softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    # Because torch.max(x, dim=dim, keepdim=True) returns two things: values and indices.
+    # values, indices = torch.max(x, dim=dim, keepdim=True) .  
+    # The values are the actual maximum numbers; the indices tell you where those maxima occurred.
+    max_x = torch.max(x, dim=dim, keepdim=True).values
+    shifted_x = x - max_x
+    exp_x = torch.exp(shifted_x)
+    sum_exp_x = torch.sum(exp_x, dim=dim, keepdim=True)
+    return exp_x / sum_exp_x
+
+
 def multi_query_attention(
     hidden_states: torch.Tensor,
     w_q: torch.Tensor,
@@ -69,7 +81,8 @@ def multi_query_attention(
 
     # Step 7 : Convert Scores into [0,1] probabilities via softmax 
     # softmax doesn't alter shape of the tensor. So, shape of attention_weights is still (B, H, T, T).
-    attention_weights = torch.softmax(scores, dim=-1)
+    # attention_weights = torch.softmax(scores, dim=-1)
+    attention_weights = safe_softmax(scores, dim=-1)
 
     # Step 8 : Get the head outputs (i.e, the weighted sum using the same v head)
     # In MQA, all query heads share the same v head.
