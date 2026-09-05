@@ -57,24 +57,23 @@ def tfidf_vectorizer(documents: list[str]) -> dict:
         if len(doc) == 0:
             continue
 
-        # Count terms manually — no Counter
-        term_counts = {}
-
+        token_frequency_for_given_doc = {}
         for token in doc:
-            if token not in term_counts:
-                term_counts[token] = 1
+            if token not in token_frequency_for_given_doc:
+                token_frequency_for_given_doc[token] = 1
             else:
-                term_counts[token] += 1
+                token_frequency_for_given_doc[token] += 1
 
-        # Compute TF-IDF
-        for token, count in term_counts.items():
-            # Term frequency
-            tf = count / len(doc)
-            # TF-IDF
+        # Compute TF-IDF for each token in the selected doc
+        for token, freq in token_frequency_for_given_doc.items():
+            # Get Term frequency score : freq / len(doc)
+            tf = freq / len(doc)
+            # Get IDF from the already conputed idf dictionary.
+            # And then, compute tfidf score. 
             tfidf = tf * idf[token]
-            # Find the correct matrix column
-            column_index = index_map[token]
-            matrix[doc_index, column_index] = tfidf
+            # Find the correct matrix column or token_index
+            token_index = index_map[token]
+            matrix[doc_index, token_index] = tfidf
             
     return {
         "vocabulary" : vocabulary,
