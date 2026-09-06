@@ -8,9 +8,9 @@ def data_types_overview(data):
     num_rows, num_columns = df.shape 
     type_counts = { }
     dtypes = { }
+    # df.dtypes is a series. 
     for col, dtype in df.dtypes.items():
         key = str(dtype)
-        # column -> dtype string
         dtypes[col] = key
         if key not in type_counts:
             type_counts[key] = 1
