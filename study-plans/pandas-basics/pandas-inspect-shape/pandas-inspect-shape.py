@@ -10,6 +10,9 @@ def inspect_dataframe(data):
     return {
         "rows" : rows,
         "cols" : cols, 
+        # The df.columns attribute returns an Index object containing the column labels. 
+        # The Index behaves like an immutable array. 
+        # We can iterate over it, check membership with in, and convert it to a list with .tolist()
         "columns" : df.columns.tolist(),
         # The df.dtypes Series maps each column to its pandas dtype.
         "dtypes" : {col : str(dtype) for col, dtype in df.dtypes.items()},
