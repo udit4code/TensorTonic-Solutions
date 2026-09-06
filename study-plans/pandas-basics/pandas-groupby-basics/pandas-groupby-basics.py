@@ -16,6 +16,8 @@ def groupby_basics(data, group_col, value_col):
     mean = grouped_df[value_col].mean()
     # Step 4 : Compute count over the value_col
     count = grouped_df[value_col].count()
+
+    # Calling .to_dict() on the resulting Series converts it to a Python dict where keys are group labels and values are the computed aggregates.
     return {
         "sum" : sum.to_dict(),
         "mean" : mean.to_dict(),
