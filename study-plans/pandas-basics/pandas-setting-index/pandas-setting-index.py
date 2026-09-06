@@ -8,6 +8,7 @@ def set_index_column(data, index_col):
     # Step 1 : Set the specified column as the DataFrame index 
     # The set_index() method moves a column from the data into the index. 
     # The column is no longer listed among regular columns, and its values become row labels.
+    #  This is useful for fast label-based lookups with loc.
     df = df.set_index(index_col)
     # Step 2 : Extract index values as a list
     index_values = df.index.tolist()
