@@ -10,7 +10,7 @@ def drop_duplicates(data):
     # Step 2 : Drop duplicates from df. 
     # The drop_duplicates() method checks all columns by default and removes rows where every value matches a previously seen row. 
     # It keeps the first occurrence by default.
-    df = df.drop_duplicates()
+    df = df.drop_duplicates(keep="first")
     rows_after = len(df)
     
     return [
