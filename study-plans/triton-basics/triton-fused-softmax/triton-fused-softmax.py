@@ -54,6 +54,8 @@ def softmax_kernel(x_ptr, y_ptr, x_row_stride, y_row_stride, n_cols, BLOCK_SIZE:
     # For large inputs like x = 1000, e^1000 causes floating-point overflow (inf).
     # Mathematically, exp(x_i) / sum(exp(x)) == exp(x_i - max) / sum(exp(x - max)).
     # Subtracting the row max forces all exponents to be <= exp(0) = 1.0, completely avoiding overflow.
+    # In Triton, tl.max(x_row, axis=0) finds the maximum (largest) value in the row vector currently held in the GPU's fast registers.
+    # In Triton, axis=0 specifies the dimension along which to perform the reduction. Since x_row is a 1D tensor, axis=0 reduces all the elements across its single dimension down to a single scalar maximum value.
     x_row = x_row - tl.max(x_row, axis=0)
 
     # Step 9 : Compute the numerator of the Softmax equation (element-wise exponential)
