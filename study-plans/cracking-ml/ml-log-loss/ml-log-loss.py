@@ -20,5 +20,6 @@ def log_loss(y_true: list, y_pred: list) -> float:
     # Step 3 : Compute the mean loss across all samples and return as a Python float
     total_loss = np.sum(loss_elements, axis=-1, keepdims=True) 
     mean_loss = total_loss / n 
+    
     return round(float(mean_loss.item()), 4)
     
