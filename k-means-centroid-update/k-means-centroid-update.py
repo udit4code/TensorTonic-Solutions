@@ -13,6 +13,7 @@ def k_means_centroid_update(points: list, assignments: list, k: int) -> list:
     
     for i in range(k):
         # Step 1: Extract all data points assigned to the current cluster index 'i'
+        # Under the hood, we use boolean indexing.
         cluster_points = points[assignments == i]
         
         # Step 2: Compute the new centroid as the mean of the cluster points
