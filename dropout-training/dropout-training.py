@@ -10,6 +10,8 @@ class Dropout:
         """
         self.p = p
 
+    # In Python, __call__ is a special "magic" or "dunder" (double underscore) method that makes an instance of a class callable just like a regular function.
+    # When we define __call__ on a class, we can execute an object using parentheses () directly on the object instance, rather than having to call a specific method name like layer.forward(x) or layer.apply(x)
     def __call__(
         self,
         x: list | np.ndarray,
