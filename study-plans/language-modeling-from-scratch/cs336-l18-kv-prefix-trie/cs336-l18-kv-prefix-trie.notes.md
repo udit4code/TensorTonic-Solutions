@@ -2,6 +2,8 @@
 
 These notes explain the [Python implementation](./cs336-l18-kv-prefix-trie.py). Start with the reason for caching, follow one example through insertion and lookup, then connect the result to GPU execution.
 
+The walkthrough below first explains the original `KVCacheTrie`. The wrapper now uses `KVCacheRadixTree`, which compresses nonbranching paths into token-sequence edges while preserving the same results. Each edge stores the original prefix IDs so a match ending inside an edge still returns the correct `cache_node`. Leaf extensions are merged into the same edge; insertions that diverge split an edge. These are logical prefix IDs, not necessarily separate radix-node objects.
+
 ## 1. What work are we trying to avoid?
 
 A language model receives text as a sequence of **tokens**. Each token has an integer ID; a token might represent a word, part of a word, or punctuation.
@@ -265,7 +267,7 @@ A full trie match returns an empty suffix, but this alone is not a complete gene
 
 ### A radix tree compresses paths
 
-Our implementation uses **one token per edge**. A radix tree can combine a chain of edges with no branching into one edge labeled by a token sequence:
+The original `KVCacheTrie` uses **one token per edge**. A radix tree can combine a chain of edges with no branching into one edge labeled by a token sequence:
 
 ```text
 Token trie:                       Compressed radix tree:
@@ -278,7 +280,272 @@ root                              root
         └── 50
 ```
 
-Both organize shared prefixes. The compressed version also needs logic to split edges when a new sequence branches partway through an edge. That logic is absent from this exercise. The [original SGLang design](https://www.lmsys.org/blog/2024-01-17-sglang/) explains its use of a radix tree.
+Both organize shared prefixes. The compressed version also needs logic to split edges when a new sequence branches partway through an edge. The new `KVCacheRadixTree` implements that split logic and is selected by `kv_prefix_trie()`. The [original SGLang design](https://www.lmsys.org/blog/2024-01-17-sglang/) explains its use of a radix tree.
+
+### Follow the actual radix implementation
+
+The diagrams in sections 4–5 show the original token trie so that every prefix is visible. The active implementation compresses those paths. **One box below is one `RadixNode` object; its `tokens` list describes the incoming edge.** The dictionary key on an arrow is only the first token of that edge.
+
+Insert the same three sequences in order:
+
+```python
+[10, 20, 30, 40]
+[10, 20, 50]
+[60, 20]
+```
+
+After the first insertion, the entire path is one object:
+
+```text
+root
+└── key 10 → tokens=[10, 20, 30, 40], prefix_ids=[1, 2, 3, 4]
+```
+
+`tokens[i]` and `prefix_ids[i]` are aligned: consuming token `30` at edge offset `2` reaches logical prefix ID `3`. The IDs describe prefixes from the root, not isolated tokens. The object's `node_id` is the final ID in its list, here `4`.
+
+On the second insertion, `insert()` looks up key `10` and compares the incoming sequence with the edge:
+
+```text
+Existing edge: [10, 20, 30, 40]
+New sequence:  [10, 20, 50]
+                ✓   ✓   ✗
+common = 2
+position = 2
+```
+
+The implementation splits the existing edge into a shared beginning and its old remainder, then adds the new branch:
+
+| Code operation | Result |
+| --- | --- |
+| `branch = RadixNode(child.tokens[:common], child.prefix_ids[:common])` | Shared edge `[10, 20]` retains IDs `[1, 2]` |
+| Slice the old child's two lists after `common` | Old edge becomes `[30, 40]`, with IDs `[3, 4]`; its descendants remain attached |
+| `branch.children[child.tokens[0]] = child` | Key `30` points to that old remainder |
+| `current.children[token] = branch` | Root key `10` now points to the shared edge |
+| Create the new suffix edge | Key `50` points to `[50]`, with newly allocated ID `[5]` |
+
+The third insertion creates a separate root edge `[60, 20]`, with IDs `[6, 7]`. The final structure is:
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 36, "nodeSpacing": 60, "rankSpacing": 65}, "themeVariables": {"fontSize": "16px"}}}%%
+flowchart TD
+    R["`Root
+node_id = 0`"]
+    A["`tokens: [10, 20]
+prefix_ids: [1, 2]
+node_id = 2`"]
+    B["`tokens: [30, 40]
+prefix_ids: [3, 4]
+node_id = 4`"]
+    C["`tokens: [50]
+prefix_ids: [5]
+node_id = 5`"]
+    D["`tokens: [60, 20]
+prefix_ids: [6, 7]
+node_id = 7`"]
+    R -->|key 10| A
+    R -->|key 60| D
+    A -->|key 30| B
+    A -->|key 50| C
+```
+
+This uses **5 objects including the root**, compared with **8 objects** in the original trie. All seven logical prefix IDs still exist as integers in edge lists. Compression reduces node objects and child dictionaries; it does not remove the token labels or compatibility IDs.
+
+### Lookup can stop inside a box
+
+For request `[10, 20, 30, 99, 40]`, follow this trace through the diagram:
+
+| Edge and action | `matched_length` | `cache_node` |
+| --- | --- | --- |
+| Root key `10` selects `[10, 20]`; consume `10` | 1 | 1 |
+| Consume `20` in the same edge | 2 | 2 |
+| Key `30` selects `[30, 40]`; consume `30` | 3 | 3 |
+| Compare request token `99` with edge token `40`; stop | 3 | 3 |
+
+The result is `{"matched_length": 3, "cache_node": 3, "uncached_suffix": [99, 40]}`. **There is no separate radix object for ID `3`.** It is stored at `prefix_ids[0]` inside the `[30, 40]` edge. Returning that object's endpoint ID `4` would be incorrect; the code uses `child.prefix_ids[common]` for each matched token.
+
+A request ending at `[10]` also stops inside an edge and returns a full one-token match. Inserting `[10]` later does not split the edge: this cache treats all prefixes as valid and has no terminal markers.
+
+### Extending a leaf keeps the path compressed
+
+Now insert `[10, 20, 30, 40, 80]` after all three sequences above. The old leaf has no children, so `insert()` extends its lists rather than adding a one-child chain:
+
+```text
+Before: tokens=[30, 40]      prefix_ids=[3, 4]
+After:  tokens=[30, 40, 80]  prefix_ids=[3, 4, 8]
+```
+
+IDs `5`, `6`, and `7` already belong to other prefixes. This explains why the implementation stores an explicit ID list rather than assuming IDs along an edge are consecutive. The number of radix objects stays at five; the extended leaf's `node_id` becomes `8`.
+
+### Live code: build, print, and query the diagram
+
+Paste the following implementation into a Python notebook cell. It is the radix implementation from the companion source, with the same wrapper signature; it needs no third-party libraries. Then run the demonstration cell immediately below it.
+
+```python
+class RadixNode:
+    """A compressed incoming edge and branches keyed by their first token.
+
+    Each token retains its original prefix ID so partial-edge matches return
+    the same cache_node as the token trie. IDs need not be consecutive when
+    an existing leaf is extended after other branches have been inserted.
+    """
+
+    def __init__(self, tokens: list[int], prefix_ids: list[int]):
+        self.tokens = tokens
+        self.prefix_ids = prefix_ids
+        self.children = {}
+
+    @property
+    def node_id(self) -> int:
+        """ID of the prefix at the end of this edge; the root is zero."""
+        return self.prefix_ids[-1] if self.prefix_ids else 0
+
+
+class KVCacheRadixTree:
+    """Path-compressed trie with the same results and prefix IDs as KVCacheTrie."""
+
+    def __init__(self):
+        self.root = RadixNode([], [])
+        self.next_node_id = 1
+
+    def insert(self, sequence: list[int]):
+        """Insert a cached sequence, splitting an edge only when paths diverge."""
+        current = self.root
+        position = 0
+        while position < len(sequence):
+            token = sequence[position]
+            child = current.children.get(token)
+            if child is None:
+                # Copy the suffix so caller mutations cannot change the tree.
+                suffix = sequence[position:]
+                prefix_ids = list(range(self.next_node_id, self.next_node_id + len(suffix)))
+                if current is not self.root and not current.children:
+                    # Extend a leaf instead of introducing a unary branch.
+                    current.tokens.extend(suffix)
+                    current.prefix_ids.extend(prefix_ids)
+                else:
+                    current.children[token] = RadixNode(suffix, prefix_ids)
+                self.next_node_id += len(suffix)
+                return
+
+            common = 0
+            while (common < len(child.tokens)
+                   and position + common < len(sequence)
+                   and child.tokens[common] == sequence[position + common]):
+                common += 1
+
+            position += common
+            if position == len(sequence):
+                # All prefixes are cached; no terminal marker or split is needed.
+                return
+            if common == len(child.tokens):
+                current = child
+                continue
+
+            # First-token lookup guarantees common >= 1. Preserve old prefix
+            # IDs and descendants while turning the common path into a branch.
+            branch = RadixNode(child.tokens[:common], child.prefix_ids[:common])
+            child.tokens = child.tokens[common:]
+            child.prefix_ids = child.prefix_ids[common:]
+            branch.children[child.tokens[0]] = child
+            current.children[token] = branch
+
+            suffix = sequence[position:]
+            prefix_ids = list(range(self.next_node_id, self.next_node_id + len(suffix)))
+            branch.children[suffix[0]] = RadixNode(suffix, prefix_ids)
+            self.next_node_id += len(suffix)
+            return
+
+    def search_prefix(self, request: list[int]) -> dict:
+        """Match tokens along compressed edges, including partial-edge matches."""
+        current = self.root
+        matched_length = 0
+        cache_node = 0
+        while matched_length < len(request):
+            child = current.children.get(request[matched_length])
+            if child is None:
+                break
+            common = 0
+            while (common < len(child.tokens)
+                   and matched_length < len(request)
+                   and child.tokens[common] == request[matched_length]):
+                cache_node = child.prefix_ids[common]
+                matched_length += 1
+                common += 1
+            if common < len(child.tokens):
+                break
+            current = child
+
+        return {
+            "matched_length": matched_length,
+            "cache_node": cache_node,
+            "uncached_suffix": request[matched_length:],
+        }
+
+
+def kv_prefix_trie(cached_sequences: list, requests: list) -> dict:
+    """
+    Returns a dict with matches: records of matched_length, cache_node, and uncached_suffix.
+    """
+    # trie = KVCacheTrie()
+    trie = KVCacheRadixTree()
+
+    # Step 1 : Build the Trie by inserting cached sequences in input order
+    for seq in cached_sequences:
+        trie.insert(seq)
+
+    # Step 2 : Evaluate each request against the constructed KV-cache Trie
+    matches = [trie.search_prefix(req) for req in requests]
+
+    return {"matches": matches}
+```
+
+The printer exposes exactly the fields shown in the boxes. This demonstration first builds the diagram, then checks a partial-edge lookup and the leaf extension:
+
+```python
+def show_radix(node, indent=""):
+    if not node.tokens:
+        print("root (node_id=0)")
+    for key, child in sorted(node.children.items()):
+        print(f"{indent}key={key}: tokens={child.tokens}, "
+              f"prefix_ids={child.prefix_ids}, node_id={child.node_id}")
+        show_radix(child, indent + "    ")
+
+
+tree = KVCacheRadixTree()
+cached_sequences = [[10, 20, 30, 40], [10, 20, 50], [60, 20]]
+for sequence in cached_sequences:
+    tree.insert(sequence)
+show_radix(tree.root)
+
+request = [10, 20, 30, 99, 40]
+result = tree.search_prefix(request)
+print("Lookup:", result)
+assert result == {
+    "matched_length": 3, "cache_node": 3, "uncached_suffix": [99, 40]
+}
+assert kv_prefix_trie(cached_sequences, [request]) == {"matches": [result]}
+assert tree.search_prefix([10]) == {
+    "matched_length": 1, "cache_node": 1, "uncached_suffix": []
+}
+
+tree.insert([10, 20, 30, 40, 80])
+leaf = tree.root.children[10].children[30]
+assert leaf.tokens == [30, 40, 80]
+assert leaf.prefix_ids == [3, 4, 8]
+print("Extended leaf:", leaf.tokens, leaf.prefix_ids)
+```
+
+Expected output:
+
+```text
+root (node_id=0)
+key=10: tokens=[10, 20], prefix_ids=[1, 2], node_id=2
+    key=30: tokens=[30, 40], prefix_ids=[3, 4], node_id=4
+    key=50: tokens=[50], prefix_ids=[5], node_id=5
+key=60: tokens=[60, 20], prefix_ids=[6, 7], node_id=7
+Lookup: {'matched_length': 3, 'cache_node': 3, 'uncached_suffix': [99, 40]}
+Extended leaf: [30, 40, 80] [3, 4, 8]
+```
 
 ### Blocks organize physical KV storage
 
@@ -314,12 +581,16 @@ Engines can use different indexes. vLLM documents a block-hash approach that inc
 | Request ends at an internal node | Returns a full match; no leaf or terminal marker is required |
 | Cached sequences inserted in a different order | Matching lengths stay the same, but assigned node IDs can change |
 
-Assuming average constant-time dictionary operations:
+For the original token trie, assuming average constant-time dictionary operations:
 
 - Inserting a sequence of length `L` takes **O(L)** time.
 - Searching a request of length `R` takes **O(R)** time overall. Traversal stops at the first mismatch, but creating the suffix list also copies its elements.
 - The trie needs **O(U)** space, where `U` is the number of distinct nonempty prefixes, plus the root. Shared paths save nodes.
 - Each returned suffix needs space proportional to its length. Building the trie takes time proportional to the total number of tokens in the cached input sequences, including repeated tokens.
+
+For the radix version, lookup still compares tokens individually and takes **O(R)** overall, including the returned suffix. Compression saves objects and dictionary traversals, not the need to check each token. Its token and prefix-ID lists still use **O(U)** storage in total.
+
+This Python implementation copies lists when it splits an edge. Splitting an existing edge of length `E` can therefore make an insertion cost **O(L + E)**, even for a short new sequence. Extending a leaf can also trigger list reallocation; appends are amortized, not guaranteed constant time per operation. Do not assume compression automatically makes every insertion faster.
 
 ## 10. Where would this be useful?
 
