@@ -9,16 +9,71 @@ A token enters a transformer layer as a vector of `d` numbers. Attention mixes i
 A matrix multiplication creates learned combinations of input features. For a single input vector `x`, output feature `j` is:
 
 ```text
-(x W)[j] = x[0] W[0,j] + x[1] W[1,j] + ... + x[d-1] W[d-1,j]
+(x @ W)[j] = x[0] * W[0,j] + x[1] * W[1,j] + ... + x[d-1] * W[d-1,j]
 ```
 
-But two linear transformations alone collapse into one: `(x W1) W2 = x (W1 W2)`. A hidden layer needs a nonlinear operation to express more than a single linear map.
+But two linear transformations alone collapse into one: `(x @ W1) @ W2 = x @ (W1 @ W2)`. A hidden layer needs a nonlinear operation to express more than a single linear map.
 
-A conventional FFN uses `activation(x W1) W2`: it projects into a hidden feature space, applies a nonlinearity, and projects back to width `d`.
+A conventional FFN uses `activation(x @ W1) @ W2`: it projects into a hidden feature space, applies a nonlinearity, and projects back to width `d`.
 
 SwiGLU gives the hidden computation two learned branches. One produces values; the other produces input-dependent multipliers for those values. Its goal is to learn useful interactions between features before projecting them back into the token representation.
 
 SwiGLU is an architectural choice, not a requirement for a working transformer. The original GLU-variants study reported quality improvements for some gated variants over ReLU/GELU FFNs in its experiments; that is empirical motivation, not a guarantee for every model. See [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202).
+
+### Intuition: why bother with SwiGLU when ReLU is simpler?
+
+**We could use ReLU. The reason to consider SwiGLU is that each hidden feature can learn both a value and a separate, input-dependent multiplier for that value.** The added machinery gives the model a direct way to express interactions between two learned signals.
+
+Compare one hidden channel before the output projection:
+
+```text
+ReLU:    hidden[j] = max(0, x @ W1[:, j])
+
+SwiGLU:  value[j]  = x @ W_v[:, j]
+         gate[j]   = SiLU(x @ W_g[:, j])
+         hidden[j] = gate[j] * value[j]
+```
+
+In the ReLU channel, the same scalar determines both whether the feature survives and its positive magnitude. In the SwiGLU channel, two different learned projections determine the value and its multiplier. Both depend on `x`, but they can attend to different combinations of its coordinates.
+
+Imagine that `x` contains two signals: `s`, evidence for a candidate feature, and `c`, evidence that the feature is relevant in the current context. A SwiGLU channel could learn:
+
+```text
+value = s
+gate  = SiLU(c)
+hidden = s * SiLU(c)
+```
+
+Hold the feature evidence fixed at `s=3` and vary the context signal:
+
+| Context signal `c` | Gate `SiLU(c)` | Hidden value `3 * SiLU(c)` |
+| --- | --- | --- |
+| `-2` | approximately `-0.2384` | approximately `-0.7152` |
+| `0` | `0` | `0` |
+| `2` | approximately `1.7616` | approximately `5.2848` |
+
+The same value can therefore contribute differently depending on a second signal. “Feature evidence” and “context relevance” are an intuition for these branches, not labels the network is required to learn. Notice also that the multiplier can be negative or greater than one; it is not a probability.
+
+A ReLU channel can also use context: for example, `max(0, a*s + b*c)` depends on both signals. The distinction is that SwiGLU explicitly **multiplies** two learned signals. A larger ReLU network can approximate such interactions too; SwiGLU provides them directly in each hidden channel. This is a useful architectural bias, not proof that it can solve tasks ReLU networks cannot.
+
+SiLU adds a smooth response as well. ReLU has zero derivative throughout its negative region; SiLU varies smoothly and does not have that entire flat negative half-line. This changes how gradients flow, but does not guarantee better optimization or eliminate vanishing gradients. The separate multiplicative branch is an additional change beyond simply swapping ReLU for a smoother activation.
+
+### Is the extra engineering worth it?
+
+Separate the architectural choice from the bookkeeping in this exercise:
+
+| Part of this implementation | Why it exists |
+| --- | --- |
+| Extra projection and `gate * value` | Give each hidden channel a learned multiplier. This is central to SwiGLU. |
+| SiLU instead of ReLU | Supply the smooth nonlinear gate used by SwiGLU. |
+| Computing `h` and slicing weights | Select a width near the requested parameter budget. A fixed-width SwiGLU layer need not perform this selection on every call. |
+| Casting to FP32 and back | Implement this exercise's numerical policy. Casting is not unique to SwiGLU; ReLU networks also need precision decisions. |
+
+At the same hidden width, SwiGLU has three weight matrices instead of two, so it costs more. Reducing its width to roughly two-thirds of the ReLU FFN width matches the matrix parameter count and approximately matches the leading matrix-multiplication work. Actual runtime can still differ because of activation operations, intermediate tensors, and hardware/kernel efficiency.
+
+The practical justification is measured model quality for the available resources. The [GLU-variants paper](https://arxiv.org/abs/2002.05202) found improvements for some gated variants in its transformer experiments. The interaction example above explains what the architecture makes convenient; it does not establish the cause of every measured improvement.
+
+ReLU remains a reasonable choice when simplicity matters or experiments show no useful gain from gating. SwiGLU is worthwhile when the quality improvement justifies its implementation and execution costs.
 
 ## 2. Build SwiGLU from its parts
 
@@ -39,26 +94,35 @@ For example, `SiLU(-2) ≈ -0.2384`, `SiLU(0) = 0`, and `SiLU(2) ≈ 1.7616`. La
 The implementation computes:
 
 ```text
-a     = x W_g
+a     = x @ W_g
 gate  = SiLU(a)
-value = x W_v
-z     = gate ⊙ value
-y     = z W_o
+value = x @ W_v
+z     = gate * value
+y     = z @ W_o
 ```
 
-Here `⊙` means element-by-element multiplication. Each hidden value gets its own learned, input-dependent multiplier. For example, a value of `3` becomes approximately `5.2848` when its gate input is `2`, but `-0.7152` when its gate input is `-2`.
+Here `@` means matrix multiplication (the same operation as `torch.matmul` here), while `*` means element-by-element multiplication (often written `⊙` in mathematics). `W_g`, `W_v`, and `W_o` in this formula denote the selected matrices of shapes `(d, h)`, `(d, h)`, and `(h, d)`. Each hidden value gets its own learned, input-dependent multiplier. For example, a value of `3` becomes approximately `5.2848` when its gate input is `2`, but `-0.7152` when its gate input is `-2`.
 
 Despite the name “gate,” **SiLU's output is not a probability or a switch restricted to `[0, 1]`**. It can attenuate, amplify, or reverse the sign of the value. The branches learn these roles jointly; their features need not correspond to human-readable concepts.
 
 ```mermaid
-flowchart LR
-    X["Token features x: (..., d)"] --&gt; G["Gate projection: x W_g"]
-    X --&gt; V["Value projection: x W_v"]
-    G --&gt; S["SiLU: a * sigmoid(a)"]
-    S --&gt; M["Elementwise multiply: (..., h)"]
-    V --&gt; M
-    M --&gt; O["Output projection: multiply by W_o"]
-    O --&gt; Y["Output: (..., d)"]
+flowchart TB
+    X["INPUT x<br/>Shape: (..., d)"]
+    X --> G["GATE BRANCH<br/>a = x @ W_g<br/>(..., d) @ (d, h) → (..., h)"]
+    X --> V["VALUE BRANCH<br/>value = x @ W_v<br/>(..., d) @ (d, h) → (..., h)"]
+    G --> S["gate = SiLU(a)<br/>Shape: (..., h)"]
+    S --> M["COMBINE MATCHING CHANNELS<br/>z = gate * value<br/>Shape: (..., h)"]
+    V --> M
+    M --> O["PROJECT BACK<br/>y = z @ W_o<br/>(..., h) @ (h, d) → (..., d)"]
+    O --> Y["OUTPUT y<br/>Same shape as x: (..., d)"]
+    classDef io fill:#e2e8f0,stroke:#475569,color:#0f172a;
+    classDef gate fill:#dbeafe,stroke:#2563eb,color:#172554;
+    classDef value fill:#fef3c7,stroke:#b45309,color:#451a03;
+    classDef result fill:#dcfce7,stroke:#15803d,color:#14532d;
+    class X,Y io;
+    class G,S gate;
+    class V value;
+    class M,O result;
 ```
 
 The `...` can represent batch and sequence dimensions. No operation here mixes token positions. The final width `d` makes the result compatible with a transformer residual stream, though this function itself does not add a residual connection.
@@ -89,7 +153,7 @@ h = min(H, max(1, math.floor(base_params / (3 * d) + 0.5)))
 parameter_count = 3 * d * h
 ```
 
-Divide by the cost of one hidden channel, round to the nearest integer with half values rounded upward, then clamp to `[1, H]`. This assumes positive `d`, available `H &gt;= 1`, and compatible matrix shapes.
+Divide by the cost of one hidden channel, round to the nearest integer with half values rounded upward, then clamp to `[1, H]`. This assumes positive `d`, available `H >= 1`, and compatible matrix shapes.
 
 **Matching is approximate; this is not a strict upper-budget rule.** For `d=2`, `H=4`, and `base_params=10`, the rule chooses `h=2` and uses 12 weights. A very small budget still selects one channel; a very large budget stops at `H`.
 
@@ -111,31 +175,73 @@ In `x @ w_g`, each **column** of `w_g` defines one hidden feature. The first col
 With `d=2`, `H=4`, and `h=2`:
 
 ```text
-                      hidden channels
-                       0   1 │  2   3
-                     ┌───────┼───────┐
-input coordinate 0   │  1   0 │  9   9│
-input coordinate 1   │  0   1 │  9   9│
-                     └───────┴───────┘
-                        keep   unused
+w_g: (d, H) = (2, 4)                w_g[:, :2]: (d, h) = (2, 2)
 
-w_g[:, :2] = [[1, 0],
-              [0, 1]]        shape: (2, 2)
+             KEEP     UNUSED          keep all input rows
+channel:     0   1     2   3           keep only columns 0 and 1
+           +-------+-------+          +-------+
+input 0    | 1   0 | 9   9 |  ---->   | 1   0 |
+input 1    | 0   1 | 9   9 |          | 0   1 |
+           +-------+-------+          +-------+
 
-x: (..., 2) @ selected w_g: (2, 2) -&gt; (..., 2)
+Each retained column produces one hidden feature:
+
+                 column 0              column 1
+x = [1, 2]  @    [1, 0]                [0, 1]
+                 1*1 + 2*0 = 1         1*0 + 2*1 = 2
+
+Result: x @ w_g[:, :2] = [1, 2]
 ```
 
 We select matching columns from `w_v` because the gate and value for hidden channel `j` must multiply together. We select matching **rows** from `w_o` because it consumes hidden channels:
 
 ```text
-x (..., d) -- W_g[:, :h] (d, h) --&gt; gate  (..., h)
-x (..., d) -- W_v[:, :h] (d, h) --&gt; value (..., h)
-                                      │
-                               gate * value
-                                      │
-                       W_o[:h, :] (h, d)
-                                      │
-                               output (..., d)
+One hidden channel j connects all THREE matrices:
+
+  w_g[:, j]             w_v[:, j]
+  column j              column j
+      |                     |
+  x @ column            x @ column
+      |                     |
+    SiLU                    |
+      |                     |
+      +-------- * ----------+
+                |
+          hidden value z[j]
+                |
+        z[j] * w_o[j, :]
+               row j
+                |
+      contribution to all d output coordinates
+
+Sum those contributions for j = 0, ..., h-1:
+    y = z @ w_o[:h, :]
+```
+
+For the same `H=4`, `h=2` example, the output matrix is sliced vertically:
+
+```text
+              w_o: (4, 2)                 w_o[:2, :]: (2, 2)
+              col 0   col 1               col 0   col 1
+              +-----------+               +-----------+
+row 0: keep   |  1     0  |               |  1     0  |
+row 1: keep   |  0     1  |       ---->   |  0     1  |
+              +-----------+               +-----------+
+row 2: omit   |  9     9  |
+row 3: omit   |  9     9  |
+              +-----------+
+```
+
+Keep the first two hidden-channel rows and every output column. The original matrix remains allocated; only the selected rows participate in this computation.
+
+```text
+z @ w_o[:h, :] = y
+
+(..., h) @ (h, d) -> (..., d)
+      ^     ^
+      |     |
+      +-----+
+   matching inner dimensions
 ```
 
 Keeping the first `h` channels is this exercise's selection convention. It does not identify the “best” neurons or make arbitrary pruning of a trained network harmless. If selecting different indices, all three matrices must use the same hidden-channel indices.
@@ -150,6 +256,28 @@ Casting cannot recover information already lost when weights were stored in a lo
 
 The function converts the final result back to `x.dtype`; that final conversion can still round or overflow. The examples below run without autocast. An enclosing autocast context can change matrix-multiplication precision despite explicit float32 operands, so this function does not by itself enforce full FP32 execution under every external configuration.
 
+### Can different columns have different dtypes because of SwiGLU?
+
+**No. A PyTorch tensor has one dtype shared by every element.** SwiGLU does not assign different dtypes to different columns.
+
+In this line, slicing selects values and casting converts the entire selected tensor:
+
+```python
+w_g_f32 = w_g[:, :h].to(torch.float32)
+```
+
+For example, with FP16 weights, `d=2`, `H=4`, and `h=2`:
+
+| Tensor or expression | Shape | Dtype of every element |
+| --- | --- | --- |
+| Original `w_g` | `(2, 4)` | `torch.float16` |
+| Slice `w_g[:, :h]` | `(2, 2)` | `torch.float16` |
+| Converted `w_g_f32` | `(2, 2)` | `torch.float32` |
+
+The slice shares the original storage and preserves its dtype. The conversion then creates a separate FP32 tensor containing copies of the selected values. **The original `w_g` stays entirely FP16**, including its first `h` columns; the cast does not modify those columns in place. If the weights were already FP32, a conversion copy would not be needed.
+
+Different tensors can have different dtypes; different columns within one ordinary tensor cannot. This is general tensor behavior, independent of SwiGLU.
+
 ### Why slice *before* casting?
 
 These produce the same selected numerical values:
@@ -161,12 +289,23 @@ b = w_g.to(torch.float32)[:, :h]
 
 Their allocation costs can differ. Basic slicing creates a view sharing the original storage. When a dtype conversion is needed, `.to()` creates a converted copy; if the dtype already matches, it can return the existing tensor. See PyTorch's [tensor views](https://docs.pytorch.org/docs/stable/tensor_view.html) and [Tensor.to documentation](https://docs.pytorch.org/docs/stable/generated/torch.Tensor.to.html).
 
+For this diagram, assume FP16 source weights and `h < H`. Both paths finish with shape `(d, h)` and dtype FP32; the difference is how much FP32 storage they create and retain.
+
 ```mermaid
-flowchart TD
-    W["Original FP16 weights: d by H"] --&gt; S["Slice: view of d by h"]
-    S --&gt; C["Cast: copy d*h values into FP32"]
-    W --&gt; F["Cast first: copy d*H values into FP32"]
-    F --&gt; V["Slice: view retaining the full FP32 storage"]
+flowchart TB
+    W["SOURCE: w_g<br/>FP16 storage for d * H values"]
+    W --> A["1. SLICE<br/>w_g[:, :h]<br/>View of d * h values; no data copy"]
+    W --> B["1. CAST<br/>w_g.to(torch.float32)<br/>Allocate FP32 copy of d * H values"]
+    A --> C["2. CAST<br/>.to(torch.float32)<br/>Allocate FP32 copy of d * h values"]
+    B --> D["2. SLICE<br/>[:, :h]<br/>View keeps full FP32 allocation alive"]
+    C --> E["FP32 STORAGE: 4 * d * h bytes<br/>Example: 128 MiB"]
+    D --> F["FP32 STORAGE: 4 * d * H bytes<br/>Example: 256 MiB"]
+    classDef source fill:#e2e8f0,stroke:#475569,color:#0f172a;
+    classDef selected fill:#dcfce7,stroke:#15803d,color:#14532d;
+    classDef full fill:#fef3c7,stroke:#b45309,color:#451a03;
+    class W source;
+    class A,C,E selected;
+    class B,D,F full;
 ```
 
 For `d=4096`, `H=16384`, `h=8192`, a dense FP32 copy of the selected gate weights contains 128 MiB of data; a full FP32 copy contains 256 MiB. This counts the converted weight data only, excluding original tensors, activations, and allocator overhead. Slicing first avoids converting unused values. It does not free the original weights.
@@ -211,12 +350,12 @@ Follow the selected matrices by hand:
 
 ```text
 x                 = [1, 2]
-x W_g_selected    = [1, 2]
+x @ W_g_selected  = [1, 2]
 SiLU(...)         ≈ [0.731059, 1.761594]
-x W_v_selected    = [2, 6]
+x @ W_v_selected  = [2, 6]
 gate * value      ≈ [1.462117, 10.569565]
 W_o_selected      = identity matrix
-FP32 output       ≈ [1.462117, 10.569565]
+z @ W_o_selected  ≈ [1.462117, 10.569565]
 returned FP16     = [1.4619140625, 10.5703125]
 ```
 
