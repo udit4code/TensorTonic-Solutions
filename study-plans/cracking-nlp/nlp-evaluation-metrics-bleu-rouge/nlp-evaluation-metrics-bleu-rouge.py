@@ -54,7 +54,8 @@ def compute_rouge_l(candidate: list, references: list) -> dict:
     """
     if not candidate or not references:
         return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
-        
+
+    # Select the reference scores that maximize the F1 score across all references
     best_scores = max(
         (compute_rouge_l_single(candidate, ref) for ref in references),
         key=lambda x: x["f1"]
@@ -111,7 +112,8 @@ def compute_rouge_n(candidate: list, references: list, n: int) -> dict:
     """
     if not candidate or not references:
         return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
-        
+
+    # Select the reference scores that maximize the F1 score across all references
     best_scores = max(
         (compute_rouge_n_single(candidate, ref, n) for ref in references),
         key=lambda x: x["f1"]
