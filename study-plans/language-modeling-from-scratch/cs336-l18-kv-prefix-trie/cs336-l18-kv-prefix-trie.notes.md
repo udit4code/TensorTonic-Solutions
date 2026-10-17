@@ -52,8 +52,6 @@ Because production serving engines typically implement the control plane and blo
 
 In a high-performance C++ backend, these structs manage the Trie topology and map logical token paths to physical GPU memory blocks (via PagedAttention). 
 
-
-
 ```
 #include &lt;unordered_map&gt;
 #include &lt;vector&gt;
