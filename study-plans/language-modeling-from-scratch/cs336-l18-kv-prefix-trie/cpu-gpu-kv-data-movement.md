@@ -323,25 +323,25 @@ sequenceDiagram
     participant CPU as CPU allocator / scheduler
     participant GPU as GPU execution
     participant Pool as Device KV pool
-    CPU->>Pool: Allocate pool; retain device base K_base
-    Note over CPU,Pool: Address range exists; KV contents are not ready yet
+    CPU->>Pool: Allocate pool, retain device base K_base
+    Note over CPU,Pool: Address range exists, KV contents are not ready yet
     CPU->>CPU: Reserve block 105 for prefix A
     CPU->>GPU: Submit producer with write slots 210 and 211
     GPU->>Pool: Write K/V for positions 2 and 3
     GPU-->>CPU: Producer completion observed
     CPU->>CPU: Publish prefix A as ready
     Note over CPU,Pool: K_base + 3388 now names a valid element of A
-    CPU->>CPU: Request B matches A; retain block 105
+    CPU->>CPU: Request B matches A, retain block 105
     CPU->>GPU: Copy B's block table and submit ordered reader
     GPU->>Pool: Read element at K_base + 3388
     GPU-->>CPU: Reader completion observed
     CPU->>CPU: Release B's ownership
     Note over CPU,Pool: Zero active users may still leave A cached
-    CPU->>CPU: Evict A when eligible; invalidate its lookup entry
+    CPU->>CPU: Evict A when eligible, invalidate its lookup entry
     CPU->>CPU: Reserve block 105 for unrelated prefix C
     CPU->>GPU: Submit a new producer for C
     GPU->>Pool: Overwrite block 105 with C's K/V
-    Note over CPU,Pool: Same numerical address; different data identity
+    Note over CPU,Pool: Same numerical address, different data identity
 ```
 
 There are three lifetimes to keep separate:
