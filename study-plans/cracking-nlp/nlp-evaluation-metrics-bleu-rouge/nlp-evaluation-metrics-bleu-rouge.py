@@ -1,18 +1,23 @@
 import math
-from collections import Counter
 
 
-def get_longest_common_subsequence_length_v1(candidate: list, reference: list) -> int:
+def get_longest_common_subsequence_length(candidate: list, reference: list) -> int:
     cache = {}
     def lcs_helper(idx, jdx):
         nonlocal cache, candidate, reference
         # Base case : When prefix length of either sequence reaches 0, then, common subsequence does not exist.
+        # Eg : if candidate = [ ] and reference = [a, b, c], then there is no lcs yet. 
         if idx == 0 or jdx == 0:
+            # If either sequence is exhausted, then, return 0
             return 0 
         if (idx, jdx) not in cache:
+            # Since (idx, jdx) is not in cache, so this subproblem is not yet solved
             if candidate[idx - 1] == reference[jdx - 1]:
+                # In case of a match, add 1 and shrink both prefixes 
                 result = 1 + lcs_helper(idx - 1, jdx - 1)
             else:
+                # In case of a mismatch, there are 2 possibilities : shrink one, while leaving the other one untouched.
+                # We explore both and take the max of both.
                 option_1 = lcs_helper(idx - 1, jdx)
                 option_2 = lcs_helper(idx, jdx - 1)
                 result = max(option_1, option_2)
@@ -22,28 +27,6 @@ def get_longest_common_subsequence_length_v1(candidate: list, reference: list) -
     return lcs_helper(len(candidate), len(reference))
 
 
-def get_longest_common_subsequence_length(candidate: list, reference: list) -> int:
-    """
-    Computes the length of the Longest Common Subsequence (LCS) 
-    between candidate and reference using bottom-up Dynamic Programming.
-    """
-    m, n = len(candidate), len(reference)
-    
-    # Initialize a 2D DP table of size (m + 1) x (n + 1) filled with zeros.
-    # dp[i][j] stores the LCS length of candidate[:i] and reference[:j].
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    
-    # Fill the DP table iteratively
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if candidate[i - 1] == reference[j - 1]:
-                # Character match: take diagonal value and add 1
-                dp[i][j] = dp[i - 1][j - 1] + 1
-            else:
-                # Character mismatch: take the maximum of skipping from either sequence
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
-                
-    return dp[m][n]
 
 
 def compute_rouge_l_single(candidate: list, reference: list) -> dict:
