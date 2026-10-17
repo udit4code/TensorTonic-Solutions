@@ -176,6 +176,97 @@ The physical layout may be reordered or packed for efficient GPU accesses. vLLM'
 
 **The GPU never needs to understand the trie.** Its input is a pool pointer, an indexing scheme, a block table, lengths, and tensors. The CPU and kernel must agree on all their meanings.
 
+### Diagram: follow one K element all the way to memory
+
+Keep the layout assumptions above: one layer's contiguous K pool, `B=2`, `H=2`, `D=4`, and BF16. We want **position 3, head 1, dimension 2**. Position 3 contains token `40`; the token ID itself is not an address.
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 36, "nodeSpacing": 50, "rankSpacing": 55}, "themeVariables": {"fontSize": "16px"}}}%%
+flowchart TD
+    A["`Logical position p = 3
+Head = 1
+Dimension = 2`"]
+    B["`Divide by block size 2
+Logical block = 1
+Offset within block = 1`"]
+    C["`Read device block table
+[102, 105, 200]
+Entry 1 gives 105`"]
+    D["`KV pool block 105
+Flat token slot:
+105 x 2 + 1 = 211`"]
+    E["`Select head and dimension
+Element index:
+211 x 8 + 1 x 4 + 2
+= 1694`"]
+    F["`Convert elements to bytes
+1694 x 2 = 3388
+Address = K_base + 3388`"]
+    G["`Device virtual address
+GPU address translation
+maps it to backing memory`"]
+    H["`Load through GPU
+memory hierarchy
+HBM supplies cache misses`"]
+    I["`The K value becomes
+available to the kernel
+for attention computation`"]
+    A --> B --> C --> D --> E --> F --> G --> H --> I
+```
+
+There are **two different mappings** here:
+
+| Mapping | Owner | Input → output |
+| --- | --- | --- |
+| KV block-table lookup | Serving software and attention kernel | Logical block `1` → allocator slot `105` |
+| Device virtual-memory translation | CUDA-managed mappings and GPU hardware | Device virtual address → physical backing memory |
+
+“Physical block 105” is the serving allocator's terminology. It is not hardware page number 105. A KV block and a hardware memory page need not have the same size or boundaries. The diagram is a conceptual dependency chain, not an assertion about the exact ordering of a particular GPU's translation and cache pipelines. CUDA distinguishes virtual address ranges from physical backing allocations; see [NVIDIA's virtual-memory guide](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/virtual-memory-management.html).
+
+For a made-up `K_base = 0x10000000`, the computed address is `0x10000D3C`, because `3388 = 0xD3C`. That is still a **device virtual address**, not an HBM chip/bank/row coordinate. The driver and hardware handle the latter mapping; our kernel does not calculate it.
+
+The V value uses its own pool base, `V_base`. Each layer also has its own cache storage in this assumed layout. The same token slot alone does not identify which layer or whether we want K or V.
+
+### Diagram: which address crosses the CPU/GPU boundary?
+
+A block-table entry is a small integer. The table itself occupies memory and has an address too. Do not confuse the **address of the table entry** with the **KV address derived from its value**.
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 36, "nodeSpacing": 50, "rankSpacing": 55}, "themeVariables": {"fontSize": "16px"}}}%%
+flowchart TD
+    A["`Pinned CPU buffer
+Host address H_table
+Values: [102, 105, 200]`"]
+    B["`Device metadata buffer
+Device address D_table
+Values: [102, 105, 200]`"]
+    C["`GPU reads entry 1
+For int64 entries:
+load from D_table + 8
+Result: integer 105`"]
+    D["`Kernel arguments
+K_base and layout
+B=2, H=2, D=4`"]
+    E["`GPU calculates K address
+Use 105 plus token offset,
+head and dimension
+Result: K_base + 3388`"]
+    F["`Existing K pool in HBM
+Read the cached value
+No prefix upload needed`"]
+    A -->|Copy table bytes| B
+    B --> C
+    C --> E
+    D --> E
+    E --> F
+```
+
+`H_table` and `D_table` are symbolic pointers to different buffers. The copy transfers their **contents**, not the CPU pointer as a substitute for a device pointer. The CPU passes the valid device pointer `D_table` to the kernel through its launch arguments; `K_base` similarly names an existing device allocation. A host-side Python tensor object can hold device-pointer metadata without its numerical tensor storage residing on the CPU.
+
+This diagram uses the demo's int64 metadata, so entry 1 is 8 bytes from the table base. A backend using int32 entries would use 4 bytes. This metadata dtype is independent of the BF16 dtype of the K/V values.
+
+The table-entry read is itself a device-memory load. Only after obtaining its value can the kernel derive the K address. Neither load requires a round trip to the CPU under our GPU-resident assumptions.
+
 ## 6. How new K/V actually get into HBM
 
 For each transformer layer, the suffix hidden states pass through the relevant projections. This produces Q/K/V for new positions on the GPU. Position transformations are applied as required by the model. Cache-writing code stores new K/V at the assigned slots, and attention reads the cached prefix plus the causally visible new positions.
@@ -222,6 +313,46 @@ In the demo we wait for `done` before returning, which simplifies lifetimes. A s
 A cache manager can expose entries early if every consumer inherits the correct dependency; alternatively it can publish only completed entries. The invariant is that no consumer reads before the producer finishes. A plain `is_cached = True` flag does not enforce that ordering.
 
 Reference counts protect ownership; completion tracking protects in-flight use. Eviction must respect both. If an implementation shares partially filled blocks and later appends divergently, it needs private storage or copy-on-write. Our example avoids that by sharing only complete blocks. For real allocator bookkeeping, see [vLLM's block pool](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/block_pool.py).
+
+### Diagram: the lifetime of an address and the data it names
+
+Follow block `105` from its first producer through a later cache hit. This diagram assumes the worker retains the same pool allocation and does not remap it during these requests. Completion means GPU work has finished, not merely that Python submitted it.
+
+```mermaid
+sequenceDiagram
+    participant CPU as CPU allocator / scheduler
+    participant GPU as GPU execution
+    participant Pool as Device KV pool
+    CPU->>Pool: Allocate pool; retain device base K_base
+    Note over CPU,Pool: Address range exists; KV contents are not ready yet
+    CPU->>CPU: Reserve block 105 for prefix A
+    CPU->>GPU: Submit producer with write slots 210 and 211
+    GPU->>Pool: Write K/V for positions 2 and 3
+    GPU-->>CPU: Producer completion observed
+    CPU->>CPU: Publish prefix A as ready
+    Note over CPU,Pool: K_base + 3388 now names a valid element of A
+    CPU->>CPU: Request B matches A; retain block 105
+    CPU->>GPU: Copy B's block table and submit ordered reader
+    GPU->>Pool: Read element at K_base + 3388
+    GPU-->>CPU: Reader completion observed
+    CPU->>CPU: Release B's ownership
+    Note over CPU,Pool: Zero active users may still leave A cached
+    CPU->>CPU: Evict A when eligible; invalidate its lookup entry
+    CPU->>CPU: Reserve block 105 for unrelated prefix C
+    CPU->>GPU: Submit a new producer for C
+    GPU->>Pool: Overwrite block 105 with C's K/V
+    Note over CPU,Pool: Same numerical address; different data identity
+```
+
+There are three lifetimes to keep separate:
+
+- **Allocation lifetime:** the pool's device address range remains usable while the allocation is owned and valid. Returning a KV block to a software free list does not necessarily free or unmap the underlying CUDA allocation.
+- **Content lifetime:** a particular prefix owns the meaning of those bytes until eviction and reuse. The address can stay numerically unchanged while its contents become a different prefix's K/V.
+- **In-flight access lifetime:** queued kernels may still read the block after the CPU has moved on. Storage cannot be overwritten until those readers finish, even if the request has been cancelled on the host.
+
+After reuse for C, an old table containing `105` may still produce an in-bounds address, but the result is semantically wrong. This can silently corrupt attention rather than crash. Correct invalidation, ownership, and completion tracking prevent that stale-table use.
+
+The sequence illustrates a conservative publish-after-completion policy. An engine may instead publish a pending entry with an explicit dependency, as discussed above. Either way, an address being allocated is not proof that the correct prefix's data is ready.
 
 ## 8. Run a small data-movement demonstration
 
