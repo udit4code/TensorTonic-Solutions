@@ -174,30 +174,30 @@ class TransformerDecoderBlock:
         """
         Executes the full forward pass of the Transformer Decoder Block.
         """
-        # 1. Masked Multi-Head Self-Attention (Q=x, K=x, V=x)
-        sa_dict = self.self_attn.forward(x, x, x, mask)
-        sa_output = sa_dict["output"]
+        # Step 1 : Masked Multi-Head Self-Attention (Q=x, K=x, V=x)
+        self_attention_dict = self.self_attn.forward(x, x, x, mask)
+        self_attention_output = self_attention_dict["output"]
         
-        # 2. First Residual Connection + Layer Normalization
-        norm1_output = self.norm1.forward(x + sa_output)
+        # Step 2 : First Residual Connection + Layer Normalization
+        norm1_output = self.norm1.forward(x + self_attention_output)
         
-        # 3. Multi-Head Cross-Attention (Q from decoder norm1_output, K & V from encoder enc_output)
-        ca_dict = self.cross_attn.forward(norm1_output, enc_output, enc_output, mask=None)
-        ca_output = ca_dict["output"]
+        # Step 3 : Multi-Head Cross-Attention (Q from decoder norm1_output, K & V from encoder enc_output)
+        cross_attention_dict = self.cross_attn.forward(norm1_output, enc_output, enc_output, mask=None)
+        cross_attention_output = cross_attention_dict["output"]
         
-        # 4. Second Residual Connection + Layer Normalization
-        norm2_output = self.norm2.forward(norm1_output + ca_output)
+        # Step 4 : Second Residual Connection + Layer Normalization
+        norm2_output = self.norm2.forward(norm1_output + cross_attention_output)
         
-        # 5. Position-wise Feed-Forward Network
+        # Step 5 : Position-wise Feed-Forward Network
         ffn_output = self.ffn.forward(norm2_output)
         
-        # 6. Third Residual Connection + Final Layer Normalization
+        # Step 6 : Third Residual Connection + Final Layer Normalization
         final_output = self.norm3.forward(norm2_output + ffn_output)
         
         return {
-            "self_attn": sa_output,
+            "self_attn": self_attention_output,
             "norm1": norm1_output,
-            "cross_attn": ca_output,
+            "cross_attn": cross_attention_output,
             "norm2": norm2_output,
             "ffn_output": ffn_output,
             "output": final_output
