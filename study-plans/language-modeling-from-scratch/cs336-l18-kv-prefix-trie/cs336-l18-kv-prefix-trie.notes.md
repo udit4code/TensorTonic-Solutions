@@ -86,15 +86,16 @@ Node IDs increase only when a new node is created:
 In this diagram, edge labels are **token IDs** and boxes show **node IDs and their prefixes**:
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 24, "nodeSpacing": 40, "rankSpacing": 45}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TD
-    n0["node 0: []"]
-    n1["node 1: [10]"]
-    n2["node 2: [10, 20]"]
-    n3["node 3: [10, 20, 30]"]
-    n4["node 4: [10, 20, 30, 40]"]
-    n5["node 5: [10, 20, 50]"]
-    n6["node 6: [60]"]
-    n7["node 7: [60, 20]"]
+    n0["node 0<br/>[]"]
+    n1["node 1<br/>[10]"]
+    n2["node 2<br/>[10, 20]"]
+    n3["node 3<br/>[10, 20, 30]"]
+    n4["node 4<br/>[10, 20, 30, 40]"]
+    n5["node 5<br/>[10, 20, 50]"]
+    n6["node 6<br/>[60]"]
+    n7["node 7<br/>[60, 20]"]
     n0 -->|10| n1
     n1 -->|20| n2
     n2 -->|30| n3
@@ -231,14 +232,15 @@ A useful architecture separates a CPU metadata index from GPU tensor storage. SG
 The following is an illustrative execution flow. `prefix_kv` and `suffix_kv` are symbolic tensor references, not values returned by our Python code.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 24, "nodeSpacing": 40, "rankSpacing": 45}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TD
-    A["Request: [10, 20, 30, 99, 40]"]
-    B["CPU: search the prefix trie"]
-    C["Match: node 3, length 3<br/>Suffix: [99, 40]"]
-    D["CPU: locate ready KV for [10, 20, 30]<br/>Reserve storage for [99, 40]"]
-    E["GPU: reuse prefix_kv<br/>Process [99, 40] using the cached prefix"]
-    F["KV available for all five tokens<br/>Continue generating the response"]
-    G["When computed KV is ready,<br/>make eligible prefixes available for reuse"]
+    A["Incoming request<br/>[10, 20, 30, 99, 40]"]
+    B["CPU lookup<br/>Search the prefix trie"]
+    C["Prefix match<br/>Node 3 · Length 3<br/>Suffix: [99, 40]"]
+    D["CPU memory planning<br/>Locate ready KV for [10, 20, 30]<br/>Reserve storage for [99, 40]"]
+    E["GPU computation<br/>Reuse prefix_kv<br/>Process [99, 40] with cached context"]
+    F["Generation<br/>KV ready for all five tokens<br/>Continue generating the response"]
+    G["Cache update<br/>Once computed KV is ready,<br/>register eligible prefixes for reuse"]
     A --> B --> C --> D --> E --> F --> G
 ```
 
@@ -349,3 +351,9 @@ Using the sample trie above:
 4. No. Search only reads the trie. In a serving engine, new KV must be computed and registered before it can be reused.
 
 </details>
+
+## 12. Go deeper: how does the CPU communicate with the GPU?
+
+A prefix match becomes numeric metadata: block IDs, token positions, sequence lengths, and write locations. The CPU transfers this metadata and submits GPU work; cached K/V already in HBM stays there. GPU kernels turn block IDs into addresses and read those tensors directly.
+
+The [CPU-to-GPU data-movement walkthrough](./cpu-gpu-kv-data-movement.md) explains the hardware assumptions, PCIe transfers, HBM, address arithmetic, CUDA streams/events, ownership, and the corresponding production source files. It includes a [runnable PyTorch demonstration](./kv-data-movement-demo.py) with a CPU mode for checking the indexing without CUDA hardware.
