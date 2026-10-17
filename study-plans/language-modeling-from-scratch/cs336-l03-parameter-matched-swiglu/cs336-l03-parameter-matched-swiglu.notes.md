@@ -107,14 +107,14 @@ Despite the name “gate,” **SiLU's output is not a probability or a switch re
 
 ```mermaid
 flowchart TB
-    X["INPUT x<br/>Shape: (..., d)"]
-    X --> G["GATE BRANCH<br/>a = x @ W_g<br/>(..., d) @ (d, h) → (..., h)"]
-    X --> V["VALUE BRANCH<br/>value = x @ W_v<br/>(..., d) @ (d, h) → (..., h)"]
-    G --> S["gate = SiLU(a)<br/>Shape: (..., h)"]
-    S --> M["COMBINE MATCHING CHANNELS<br/>z = gate * value<br/>Shape: (..., h)"]
-    V --> M
-    M --> O["PROJECT BACK<br/>y = z @ W_o<br/>(..., h) @ (h, d) → (..., d)"]
-    O --> Y["OUTPUT y<br/>Same shape as x: (..., d)"]
+    X["INPUT x&lt;br/&gt;Shape: (..., d)"]
+    X --&gt; G["GATE BRANCH&lt;br/&gt;a = x @ W_g&lt;br/&gt;(..., d) @ (d, h) → (..., h)"]
+    X --&gt; V["VALUE BRANCH&lt;br/&gt;value = x @ W_v&lt;br/&gt;(..., d) @ (d, h) → (..., h)"]
+    G --&gt; S["gate = SiLU(a)&lt;br/&gt;Shape: (..., h)"]
+    S --&gt; M["COMBINE MATCHING CHANNELS&lt;br/&gt;z = gate * value&lt;br/&gt;Shape: (..., h)"]
+    V --&gt; M
+    M --&gt; O["PROJECT BACK&lt;br/&gt;y = z @ W_o&lt;br/&gt;(..., h) @ (h, d) → (..., d)"]
+    O --&gt; Y["OUTPUT y&lt;br/&gt;Same shape as x: (..., d)"]
     classDef io fill:#e2e8f0,stroke:#475569,color:#0f172a;
     classDef gate fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef value fill:#fef3c7,stroke:#b45309,color:#451a03;
@@ -153,7 +153,7 @@ h = min(H, max(1, math.floor(base_params / (3 * d) + 0.5)))
 parameter_count = 3 * d * h
 ```
 
-Divide by the cost of one hidden channel, round to the nearest integer with half values rounded upward, then clamp to `[1, H]`. This assumes positive `d`, available `H >= 1`, and compatible matrix shapes.
+Divide by the cost of one hidden channel, round to the nearest integer with half values rounded upward, then clamp to `[1, H]`. This assumes positive `d`, available `H &gt;= 1`, and compatible matrix shapes.
 
 **Matching is approximate; this is not a strict upper-budget rule.** For `d=2`, `H=4`, and `base_params=10`, the rule chooses `h=2` and uses 12 weights. A very small budget still selects one channel; a very large budget stops at `H`.
 
@@ -180,7 +180,7 @@ w_g: (d, H) = (2, 4)                w_g[:, :2]: (d, h) = (2, 2)
              KEEP     UNUSED          keep all input rows
 channel:     0   1     2   3           keep only columns 0 and 1
            +-------+-------+          +-------+
-input 0    | 1   0 | 9   9 |  ---->   | 1   0 |
+input 0    | 1   0 | 9   9 |  ----&gt;   | 1   0 |
 input 1    | 0   1 | 9   9 |          | 0   1 |
            +-------+-------+          +-------+
 
@@ -225,7 +225,7 @@ For the same `H=4`, `h=2` example, the output matrix is sliced vertically:
               col 0   col 1               col 0   col 1
               +-----------+               +-----------+
 row 0: keep   |  1     0  |               |  1     0  |
-row 1: keep   |  0     1  |       ---->   |  0     1  |
+row 1: keep   |  0     1  |       ----&gt;   |  0     1  |
               +-----------+               +-----------+
 row 2: omit   |  9     9  |
 row 3: omit   |  9     9  |
@@ -237,7 +237,7 @@ Keep the first two hidden-channel rows and every output column. The original mat
 ```text
 z @ w_o[:h, :] = y
 
-(..., h) @ (h, d) -> (..., d)
+(..., h) @ (h, d) -&gt; (..., d)
       ^     ^
       |     |
       +-----+
@@ -289,17 +289,17 @@ b = w_g.to(torch.float32)[:, :h]
 
 Their allocation costs can differ. Basic slicing creates a view sharing the original storage. When a dtype conversion is needed, `.to()` creates a converted copy; if the dtype already matches, it can return the existing tensor. See PyTorch's [tensor views](https://docs.pytorch.org/docs/stable/tensor_view.html) and [Tensor.to documentation](https://docs.pytorch.org/docs/stable/generated/torch.Tensor.to.html).
 
-For this diagram, assume FP16 source weights and `h < H`. Both paths finish with shape `(d, h)` and dtype FP32; the difference is how much FP32 storage they create and retain.
+For this diagram, assume FP16 source weights and `h &lt; H`. Both paths finish with shape `(d, h)` and dtype FP32; the difference is how much FP32 storage they create and retain.
 
 ```mermaid
 flowchart TB
-    W["SOURCE: w_g<br/>FP16 storage for d * H values"]
-    W --> A["1. SLICE<br/>w_g[:, :h]<br/>View of d * h values; no data copy"]
-    W --> B["1. CAST<br/>w_g.to(torch.float32)<br/>Allocate FP32 copy of d * H values"]
-    A --> C["2. CAST<br/>.to(torch.float32)<br/>Allocate FP32 copy of d * h values"]
-    B --> D["2. SLICE<br/>[:, :h]<br/>View keeps full FP32 allocation alive"]
-    C --> E["FP32 STORAGE: 4 * d * h bytes<br/>Example: 128 MiB"]
-    D --> F["FP32 STORAGE: 4 * d * H bytes<br/>Example: 256 MiB"]
+    W["SOURCE: w_g&lt;br/&gt;FP16 storage for d * H values"]
+    W --&gt; A["1. SLICE&lt;br/&gt;w_g[:, :h]&lt;br/&gt;View of d * h values; no data copy"]
+    W --&gt; B["1. CAST&lt;br/&gt;w_g.to(torch.float32)&lt;br/&gt;Allocate FP32 copy of d * H values"]
+    A --&gt; C["2. CAST&lt;br/&gt;.to(torch.float32)&lt;br/&gt;Allocate FP32 copy of d * h values"]
+    B --&gt; D["2. SLICE&lt;br/&gt;[:, :h]&lt;br/&gt;View keeps full FP32 allocation alive"]
+    C --&gt; E["FP32 STORAGE: 4 * d * h bytes&lt;br/&gt;Example: 128 MiB"]
+    D --&gt; F["FP32 STORAGE: 4 * d * H bytes&lt;br/&gt;Example: 256 MiB"]
     classDef source fill:#e2e8f0,stroke:#475569,color:#0f172a;
     classDef selected fill:#dcfce7,stroke:#15803d,color:#14532d;
     classDef full fill:#fef3c7,stroke:#b45309,color:#451a03;
