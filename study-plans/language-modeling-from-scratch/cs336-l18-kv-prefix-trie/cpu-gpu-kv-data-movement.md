@@ -22,7 +22,7 @@ The concrete example assumes:
 
 These are teaching assumptions, not requirements for all serving engines. A Mac with unified memory does not have this same PCIe-to-discrete-HBM path. A GPU using GDDR has device memory but not HBM. NVLink between GPUs is not automatically the CPU-to-GPU connection.
 
-The cache layout and code below are deliberately simplified. Production source links appear in section 9; they are not claims that every engine uses the same layout or backend.
+The cache layout and code below are deliberately simplified. Production source links appear in section 8; they are not claims that every engine uses the same layout or backend.
 
 ## 2. CPU, GPU, and HBM: who computes and who stores?
 
@@ -263,7 +263,7 @@ No prefix upload needed`"]
 
 `H_table` and `D_table` are symbolic pointers to different buffers. The copy transfers their **contents**, not the CPU pointer as a substitute for a device pointer. The CPU passes the valid device pointer `D_table` to the kernel through its launch arguments; `K_base` similarly names an existing device allocation. A host-side Python tensor object can hold device-pointer metadata without its numerical tensor storage residing on the CPU.
 
-This diagram uses the demo's int64 metadata, so entry 1 is 8 bytes from the table base. A backend using int32 entries would use 4 bytes. This metadata dtype is independent of the BF16 dtype of the K/V values.
+This diagram assumes int64 metadata, so entry 1 is 8 bytes from the table base. A backend using int32 entries would use 4 bytes. This metadata dtype is independent of the BF16 dtype of the K/V values.
 
 The table-entry read is itself a device-memory load. Only after obtaining its value can the kernel derive the K address. Neither load requires a round trip to the CPU under our GPU-resident assumptions.
 
@@ -308,7 +308,7 @@ Host storage:  keep buffers valid and unchanged until their use finishes
 KV blocks:     keep ownership until all GPU readers finish
 ```
 
-In the demo we wait for `done` before returning, which simplifies lifetimes. A server can poll completion events and recycle buffers later. Reusable staging buffers need completion tracking too; otherwise the next batch can overwrite bytes still being transferred.
+Waiting for `done` before returning simplifies buffer lifetimes. A server can poll completion events and recycle buffers later. Reusable staging buffers need completion tracking too; otherwise the next batch can overwrite bytes still being transferred.
 
 A cache manager can expose entries early if every consumer inherits the correct dependency; alternatively it can publish only completed entries. The invariant is that no consumer reads before the producer finishes. A plain `is_cached = True` flag does not enforce that ordering.
 
@@ -354,130 +354,9 @@ After reuse for C, an old table containing `105` may still produce an in-bounds 
 
 The sequence illustrates a conservative publish-after-completion policy. An engine may instead publish a pending entry with an explicit dependency, as discussed above. Either way, an address being allocated is not proof that the correct prefix's data is ready.
 
-## 8. Run a small data-movement demonstration
+## 8. Where this appears in production code
 
-Paste the complete block below into a Python notebook cell and execute it to define `run()`. It requires PyTorch. It initializes a tiny KV pool, transfers the execution metadata, writes synthetic suffix K/V, and checks paged attention against a contiguous reference.
-
-```python
-from contextlib import nullcontext
-
-import torch
-
-
-def run(device_name: str) -> None:
-    if device_name == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError('CUDA is unavailable. Call run("cpu") for the arithmetic demo.')
-    device = torch.device(device_name)
-    use_cuda = device.type == "cuda"
-    block_size = 2
-
-    # Persistent pools in a server; here: [blocks, tokens, dimension].
-    k_pool = torch.zeros((201, block_size, 1), device=device)
-    v_pool = torch.zeros_like(k_pool)
-    # Simulate READY K/V from a previous request, already on the device.
-    k_pool[102, :, 0] = torch.tensor([0.1, 0.2], device=device)
-    k_pool[105, :, 0] = torch.tensor([0.3, 0.4], device=device)
-    v_pool[102, :, 0] = torch.tensor([1.0, 2.0], device=device)
-    v_pool[105, :, 0] = torch.tensor([3.0, 4.0], device=device)
-    prefix_k_before = k_pool[[102, 105]].clone()
-    prefix_v_before = v_pool[[102, 105]].clone()
-
-    # CPU plan: metadata and new tokens, not the cached prefix tensors.
-    fields = {
-        "tokens": [99, 88],
-        "positions": [4, 5],
-        "block_table": [102, 105, 200],
-        "write_slots": [400, 401],  # Block 200 * 2 + within-block offset.
-    }
-    host = {}
-    gpu = {}
-    for name, values in fields.items():
-        host[name] = torch.empty(len(values), dtype=torch.int64, pin_memory=use_cuda)
-        host[name].copy_(torch.tensor(values, dtype=torch.int64))
-        gpu[name] = torch.empty(len(values), dtype=torch.int64, device=device)
-
-    copy_stream = torch.cuda.Stream(device=device) if use_cuda else None
-    compute_stream = torch.cuda.Stream(device=device) if use_cuda else None
-    if use_cuda:
-        # Side streams must wait for setup on the current stream too.
-        copy_stream.wait_stream(torch.cuda.current_stream(device))
-        compute_stream.wait_stream(torch.cuda.current_stream(device))
-
-    with torch.cuda.stream(copy_stream) if use_cuda else nullcontext():
-        for name in fields:
-            gpu[name].copy_(host[name], non_blocking=use_cuda)
-        if use_cuda:
-            metadata_ready = torch.cuda.Event()
-            metadata_ready.record(copy_stream)
-
-    with torch.cuda.stream(compute_stream) if use_cuda else nullcontext():
-        if use_cuda:
-            compute_stream.wait_event(metadata_ready)
-        # Toy K/V computed on the device. A real model projects hidden states.
-        new_k = gpu["tokens"].float().unsqueeze(1) / 100
-        new_v = gpu["tokens"].float().unsqueeze(1) / 10
-        k_pool.view(-1, 1).index_copy_(0, gpu["write_slots"], new_k)
-        v_pool.view(-1, 1).index_copy_(0, gpu["write_slots"], new_v)
-
-        # Resolve logical positions through the request's block table.
-        logical_positions = torch.arange(6, device=device)
-        physical_blocks = gpu["block_table"][logical_positions // block_size]
-        read_slots = physical_blocks * block_size + logical_positions % block_size
-        # Teaching-only gather: copies data within the device. Production
-        # paged attention reads tiles directly instead of materializing this.
-        keys = k_pool.view(-1, 1).index_select(0, read_slots)
-        values = v_pool.view(-1, 1).index_select(0, read_slots)
-        queries = torch.ones((2, 1), device=device)
-        scores = queries @ keys.T  # Head dimension 1, so sqrt(d) = 1.
-        mask = logical_positions.unsqueeze(0) <= gpu["positions"].unsqueeze(1)
-        output = scores.masked_fill(~mask, float("-inf")).softmax(-1) @ values
-        if use_cuda:
-            finished = torch.cuda.Event()
-            finished.record(compute_stream)
-
-    # Retain host/device buffers and pool ownership until work finishes.
-    if use_cuda:
-        finished.synchronize()  # Deliberate blocking boundary for the demo.
-    expected_slots = torch.tensor([204, 205, 210, 211, 400, 401])
-    torch.testing.assert_close(read_slots.cpu(), expected_slots)
-    torch.testing.assert_close(k_pool[[102, 105]], prefix_k_before)
-    torch.testing.assert_close(v_pool[[102, 105]], prefix_v_before)
-    reference_tokens = torch.tensor([10, 20, 30, 40, 99, 88], dtype=torch.float32)
-    reference_scores = (reference_tokens / 100).repeat(2, 1)
-    reference_scores[0, 5] = float("-inf")  # Position 4 cannot see position 5.
-    reference = reference_scores.softmax(-1) @ (reference_tokens / 10).unsqueeze(1)
-    torch.testing.assert_close(output.cpu(), reference)
-    print(f"Device: {device}; metadata payload: 72 bytes (excluding launch overhead)")
-    print("Physical read slots:", read_slots.cpu().tolist())
-    print("Attention outputs:", output.cpu().flatten().tolist())
-    print("PASS: reused prefix unchanged; paged lookup matches contiguous reference.")
-    if not use_cuda:
-        print("CPU mode checks arithmetic only; it does not exercise CUDA transfers or streams.")
-```
-
-Then execute **one** of these calls in a new Python cell:
-
-```python
-run("cuda")  # Requires a CUDA-enabled PyTorch installation and an NVIDIA GPU.
-```
-
-Or, to verify the arithmetic without CUDA:
-
-```python
-run("cpu")
-```
-
-Use the quoted Python argument and no `%` or `!` prefix. `%run` is a notebook command for executing a file, not for calling this function.
-
-Expected physical read slots are `[204, 205, 210, 211, 400, 401]`, with attention outputs approximately `[5.11586, 5.98069]`. The assertions check those addresses, both unchanged prefix pools, and attention against the reference. The CPU path has been verified locally; CUDA execution requires GPU validation.
-
-**This is instructional code, not production serving code.** It uses one-dimensional synthetic K/V, not a trained transformer. Its `index_select` materializes a contiguous copy on the device to make the mapping easy to inspect. A production paged-attention kernel reads tiles directly from the pool. It omits batching, memory pressure, eviction, distributed execution, and fused kernels.
-
-The demo retains all buffers until completion. A more general PyTorch multi-stream implementation must also manage allocator lifetimes, using explicit lifetime control or appropriate stream recording. `non_blocking=True` alone guarantees neither useful overlap nor correct cross-stream dependencies. See [PyTorch CUDA semantics](https://docs.pytorch.org/docs/2.14/notes/cuda.html).
-
-## 9. Where this appears in production code
-
-These are real vLLM source entry points inspected for this explanation. The links track `main`, so symbol organization can change; pin your deployed revision when investigating an incident. The teaching demo is original code, not an extracted vLLM implementation.
+These are real vLLM source entry points inspected for this explanation. The links track `main`, so symbol organization can change; pin your deployed revision when investigating an incident.
 
 | Responsibility | Production source to inspect |
 | --- | --- |
@@ -489,7 +368,7 @@ These are real vLLM source entry points inspected for this explanation. The link
 
 Follow the data in that order. The source-level bridge is the metadata tensor plus the kernel arguments. It is not a CPU `TrieNode` object being sent to CUDA. Specific attention backends can use different kernels from the documented paged-attention example.
 
-## 10. How much data moves?
+## 9. How much data moves?
 
 Separate **host/device traffic** from **GPU memory traffic**. A local cache hit can avoid transferring the prefix across PCIe while still reading its K/V through the GPU memory hierarchy during attention.
 
@@ -504,11 +383,11 @@ KV for a 4,096-token prefix = 4,096 × 128 KiB = 512 MiB
 
 With an assumed production block size of 16, that prefix has 256 blocks. A single 32-bit block-table row would occupy `256 × 4 = 1,024 bytes`, excluding other metadata. Reusing 512 MiB of resident KV can therefore involve a roughly 1 KiB block-table description instead of uploading those 512 MiB. This is a size comparison, not a latency benchmark or total traffic estimate.
 
-The toy demo uses int64 for all four arrays: `(2 + 2 + 3 + 2) × 8 = 72 bytes`. It excludes launch overhead and hard-codes some lengths. Startup initialization is also excluded.
+Using int64 for the new token IDs, positions, block table, and write slots in our example gives `(2 + 2 + 3 + 2) × 8 = 72 bytes`. This excludes lengths, other metadata, launch overhead, and startup initialization.
 
 For intuition only, assume an effective transfer rate of 25 GB/s. Moving 512 MiB then takes at least `536,870,912 / 25,000,000,000 ≈ 21.5 ms`, before other overheads. That is hypothetical arithmetic, not a claim about a particular GPU. Tiny transfers are often dominated by submission and synchronization costs rather than payload bandwidth.
 
-## 11. What changes when the KV is elsewhere?
+## 10. What changes when the KV is elsewhere?
 
 The original residency assumption matters:
 
@@ -520,11 +399,11 @@ The original residency assumption matters:
 | Another machine | Coordinate a network transfer and destination placement before use |
 | Evicted with no retained copy | Recompute the missing state |
 
-These are architectural cases, not APIs implemented by the demo. A remote block ID `102` has no useful local meaning unless a protocol maps it to the destination worker's storage. Distributed cache reuse needs both an identity match and a data-placement protocol.
+These architectural cases require additional data-placement mechanisms. A remote block ID `102` has no useful local meaning unless a protocol maps it to the destination worker's storage. Distributed cache reuse needs both an identity match and a data-placement protocol.
 
 Likewise, a process boundary between scheduler and worker adds an IPC/RPC step before the worker's CUDA submission. The prefix tree can live in a different process from the GPU owner, but Python object references and raw pointers are not automatically portable across that boundary.
 
-## 12. What I would verify as the platform owner
+## 11. What I would verify as the platform owner
 
 I would first validate numerical correctness: compare cached and uncached execution with tolerances appropriate to the dtype/backend, including partial hits and divergent suffixes. Then exercise concurrent reuse and eviction to expose ownership errors.
 
