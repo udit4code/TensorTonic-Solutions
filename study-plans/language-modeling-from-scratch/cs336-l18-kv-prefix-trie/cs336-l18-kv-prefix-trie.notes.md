@@ -356,4 +356,4 @@ Using the sample trie above:
 
 A prefix match becomes numeric metadata: block IDs, token positions, sequence lengths, and write locations. The CPU transfers this metadata and submits GPU work; cached K/V already in HBM stays there. GPU kernels turn block IDs into addresses and read those tensors directly.
 
-The [CPU-to-GPU data-movement walkthrough](./cpu-gpu-kv-data-movement.md) explains the hardware assumptions, PCIe transfers, HBM, address arithmetic, CUDA streams/events, ownership, and the corresponding production source files. It includes a [runnable PyTorch demonstration](./kv-data-movement-demo.py) with a CPU mode for checking the indexing without CUDA hardware.
+The [CPU-to-GPU data-movement walkthrough](./cpu-gpu-kv-data-movement.md) explains the hardware assumptions, PCIe transfers, HBM, address arithmetic, CUDA streams/events, ownership, and the corresponding production source files. It includes a [runnable PyTorch demonstration](./cpu-gpu-kv-data-movement.md#8-run-a-small-data-movement-demonstration) with a CPU mode for checking the indexing without CUDA hardware.

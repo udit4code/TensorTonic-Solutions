@@ -42,19 +42,38 @@ The cache layout and code below are deliberately simplified. Production source l
 Data stored in HBM can be read repeatedly during attention. The **KV cache** is a software-managed tensor store; it is distinct from hardware caches such as L2. For the host/device separation and memory hierarchy, see [NVIDIA's CUDA Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html).
 
 ```mermaid
-%%{init: {"flowchart": {"htmlLabels": false, "padding": 24, "rankSpacing": 45}, "themeVariables": {"fontSize": "16px"}}}%%
+%%{init: {"flowchart": {"htmlLabels": false, "padding": 36, "nodeSpacing": 60, "rankSpacing": 65}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TD
-    A["CPU cores<br/>Prefix lookup and scheduling"]
-    B["CPU DRAM<br/>Block table: [102, 105, 200]<br/>New tokens: [99, 88]"]
-    C["Pinned staging buffer<br/>Compact numeric arrays"]
-    D["PCIe transfer<br/>DMA copies metadata to device"]
-    E["GPU HBM<br/>Device metadata and KV pool<br/>Cached blocks 102 and 105"]
-    F["GPU SMs execute kernels<br/>Read cached K/V<br/>Write new K/V to block 200"]
+    A["`CPU cores
+Prefix lookup
+and scheduling`"]
+    B["`CPU DRAM
+Block table:
+[102, 105, 200]
+New tokens: [99, 88]`"]
+    C["`Pinned staging buffer
+Compact numeric
+arrays`"]
+    D["`PCIe transfer
+DMA copies metadata
+to the device`"]
+    E["`GPU HBM
+Device metadata
+and KV pool
+Cached blocks:
+102 and 105`"]
+    F["`GPU SMs
+Execute kernels
+Read cached K/V
+Write new K/V
+to block 200`"]
     A --> B --> C --> D --> E
-    A -->|CUDA launch submission| F
-    E -->|loads through memory hierarchy| F
-    F -->|stores through memory hierarchy| E
+    A -->|CUDA launch| F
+    E -->|Loads| F
+    F -->|Stores| E
 ```
+
+Loads and stores pass through the GPU memory hierarchy between the SMs and HBM.
 
 The two paths into the GPU are related but different: a **data transfer** makes input bytes available; a **kernel launch** requests computation with particular arguments. Launching a kernel does not recursively copy Python objects or everything reachable from a pointer.
 
@@ -206,36 +225,120 @@ Reference counts protect ownership; completion tracking protects in-flight use. 
 
 ## 8. Run a small data-movement demonstration
 
-The companion [kv-data-movement-demo.py](./kv-data-movement-demo.py) implements the numeric example with real PyTorch operations:
-
-```bash
-# On a machine with CUDA-enabled PyTorch and an NVIDIA GPU:
-python kv-data-movement-demo.py --device cuda
-
-# On a CPU-only machine; verifies arithmetic, not CUDA behavior:
-python kv-data-movement-demo.py --device cpu
-```
-
-It initializes a tiny device KV pool, transfers the plan, writes synthetic suffix K/V, reads the six logical positions, applies causal attention, and checks the result against a contiguous reference. The prefix blocks must remain unchanged.
-
-The essential transfer and synchronization pattern, excerpted conceptually from the demo, is:
+Paste the complete block below into a Python notebook cell and execute it to define `run()`. It requires PyTorch. It initializes a tiny KV pool, transfers the execution metadata, writes synthetic suffix K/V, and checks paged attention against a contiguous reference.
 
 ```python
-# host arrays are pinned; gpu arrays are already allocated.
-# Setup must also be ordered before these side streams use the allocations.
-with torch.cuda.stream(copy_stream):
-    for name in fields:
-        gpu[name].copy_(host[name], non_blocking=True)
-    metadata_ready.record(copy_stream)
+from contextlib import nullcontext
 
-with torch.cuda.stream(compute_stream):
-    compute_stream.wait_event(metadata_ready)
-    # GPU operations consume gpu["block_table"] and write assigned slots.
-    # ... see the complete runnable file for the actual operations ...
-    finished.record(compute_stream)
+import torch
 
-finished.synchronize()  # Intentional demo boundary, not a per-layer server pattern.
+
+def run(device_name: str) -> None:
+    if device_name == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError('CUDA is unavailable. Call run("cpu") for the arithmetic demo.')
+    device = torch.device(device_name)
+    use_cuda = device.type == "cuda"
+    block_size = 2
+
+    # Persistent pools in a server; here: [blocks, tokens, dimension].
+    k_pool = torch.zeros((201, block_size, 1), device=device)
+    v_pool = torch.zeros_like(k_pool)
+    # Simulate READY K/V from a previous request, already on the device.
+    k_pool[102, :, 0] = torch.tensor([0.1, 0.2], device=device)
+    k_pool[105, :, 0] = torch.tensor([0.3, 0.4], device=device)
+    v_pool[102, :, 0] = torch.tensor([1.0, 2.0], device=device)
+    v_pool[105, :, 0] = torch.tensor([3.0, 4.0], device=device)
+    prefix_k_before = k_pool[[102, 105]].clone()
+    prefix_v_before = v_pool[[102, 105]].clone()
+
+    # CPU plan: metadata and new tokens, not the cached prefix tensors.
+    fields = {
+        "tokens": [99, 88],
+        "positions": [4, 5],
+        "block_table": [102, 105, 200],
+        "write_slots": [400, 401],  # Block 200 * 2 + within-block offset.
+    }
+    host = {}
+    gpu = {}
+    for name, values in fields.items():
+        host[name] = torch.empty(len(values), dtype=torch.int64, pin_memory=use_cuda)
+        host[name].copy_(torch.tensor(values, dtype=torch.int64))
+        gpu[name] = torch.empty(len(values), dtype=torch.int64, device=device)
+
+    copy_stream = torch.cuda.Stream(device=device) if use_cuda else None
+    compute_stream = torch.cuda.Stream(device=device) if use_cuda else None
+    if use_cuda:
+        # Side streams must wait for setup on the current stream too.
+        copy_stream.wait_stream(torch.cuda.current_stream(device))
+        compute_stream.wait_stream(torch.cuda.current_stream(device))
+
+    with torch.cuda.stream(copy_stream) if use_cuda else nullcontext():
+        for name in fields:
+            gpu[name].copy_(host[name], non_blocking=use_cuda)
+        if use_cuda:
+            metadata_ready = torch.cuda.Event()
+            metadata_ready.record(copy_stream)
+
+    with torch.cuda.stream(compute_stream) if use_cuda else nullcontext():
+        if use_cuda:
+            compute_stream.wait_event(metadata_ready)
+        # Toy K/V computed on the device. A real model projects hidden states.
+        new_k = gpu["tokens"].float().unsqueeze(1) / 100
+        new_v = gpu["tokens"].float().unsqueeze(1) / 10
+        k_pool.view(-1, 1).index_copy_(0, gpu["write_slots"], new_k)
+        v_pool.view(-1, 1).index_copy_(0, gpu["write_slots"], new_v)
+
+        # Resolve logical positions through the request's block table.
+        logical_positions = torch.arange(6, device=device)
+        physical_blocks = gpu["block_table"][logical_positions // block_size]
+        read_slots = physical_blocks * block_size + logical_positions % block_size
+        # Teaching-only gather: copies data within the device. Production
+        # paged attention reads tiles directly instead of materializing this.
+        keys = k_pool.view(-1, 1).index_select(0, read_slots)
+        values = v_pool.view(-1, 1).index_select(0, read_slots)
+        queries = torch.ones((2, 1), device=device)
+        scores = queries @ keys.T  # Head dimension 1, so sqrt(d) = 1.
+        mask = logical_positions.unsqueeze(0) <= gpu["positions"].unsqueeze(1)
+        output = scores.masked_fill(~mask, float("-inf")).softmax(-1) @ values
+        if use_cuda:
+            finished = torch.cuda.Event()
+            finished.record(compute_stream)
+
+    # Retain host/device buffers and pool ownership until work finishes.
+    if use_cuda:
+        finished.synchronize()  # Deliberate blocking boundary for the demo.
+    expected_slots = torch.tensor([204, 205, 210, 211, 400, 401])
+    torch.testing.assert_close(read_slots.cpu(), expected_slots)
+    torch.testing.assert_close(k_pool[[102, 105]], prefix_k_before)
+    torch.testing.assert_close(v_pool[[102, 105]], prefix_v_before)
+    reference_tokens = torch.tensor([10, 20, 30, 40, 99, 88], dtype=torch.float32)
+    reference_scores = (reference_tokens / 100).repeat(2, 1)
+    reference_scores[0, 5] = float("-inf")  # Position 4 cannot see position 5.
+    reference = reference_scores.softmax(-1) @ (reference_tokens / 10).unsqueeze(1)
+    torch.testing.assert_close(output.cpu(), reference)
+    print(f"Device: {device}; metadata payload: 72 bytes (excluding launch overhead)")
+    print("Physical read slots:", read_slots.cpu().tolist())
+    print("Attention outputs:", output.cpu().flatten().tolist())
+    print("PASS: reused prefix unchanged; paged lookup matches contiguous reference.")
+    if not use_cuda:
+        print("CPU mode checks arithmetic only; it does not exercise CUDA transfers or streams.")
 ```
+
+Then execute **one** of these calls in a new Python cell:
+
+```python
+run("cuda")  # Requires a CUDA-enabled PyTorch installation and an NVIDIA GPU.
+```
+
+Or, to verify the arithmetic without CUDA:
+
+```python
+run("cpu")
+```
+
+Use the quoted Python argument and no `%` or `!` prefix. `%run` is a notebook command for executing a file, not for calling this function.
+
+Expected physical read slots are `[204, 205, 210, 211, 400, 401]`, with attention outputs approximately `[5.11586, 5.98069]`. The assertions check those addresses, both unchanged prefix pools, and attention against the reference. The CPU path has been verified locally; CUDA execution requires GPU validation.
 
 **This is instructional code, not production serving code.** It uses one-dimensional synthetic K/V, not a trained transformer. Its `index_select` materializes a contiguous copy on the device to make the mapping easy to inspect. A production paged-attention kernel reads tiles directly from the pool. It omits batching, memory pressure, eviction, distributed execution, and fused kernels.
 
