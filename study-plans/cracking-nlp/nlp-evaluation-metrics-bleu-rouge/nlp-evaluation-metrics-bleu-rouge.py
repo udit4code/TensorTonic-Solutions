@@ -84,22 +84,31 @@ def compute_rouge_l(candidate: list, references: list) -> dict:
     }
 
 
-def get_ngrams(tokens: list, n: int) -> list:
+def get_ngrams_dict(tokens: list, n: int) -> dict:
     """
-    Extracts a list of n-gram tuples of size n from a token list.
+    Extracts n-grams of size n from a token list and returns a frequency dictionary 
+    using standard Python dictionaries instead of collections.Counter.
     """
-    return [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+    ngram_counts = {}
+    if len(tokens) < n:
+        return ngram_counts
+        
+    for i in range(len(tokens) - n + 1):
+        ngram = tuple(tokens[i : i + n])
+        ngram_counts[ngram] = ngram_counts.get(ngram, 0) + 1
+        
+    return ngram_counts
 
 
 def compute_rouge_n_single(candidate: list, reference: list, n: int) -> dict:
     """
     Computes ROUGE-N precision, recall, and F1 between a single candidate 
-    and reference using frequency counters and clipped overlap.
+    and reference using standard dictionaries and clipped overlap.
     """
-    cand_ng = Counter(get_ngrams(candidate, n))
-    ref_ng = Counter(get_ngrams(reference, n))
+    cand_ng = get_ngrams_dict(candidate, n)
+    ref_ng = get_ngrams_dict(reference, n)
     
-    matched = sum(min(cand_ng[ng], ref_ng[ng]) for ng in cand_ng)
+    matched = sum(min(count, ref_ng.get(ng, 0)) for ng, count in cand_ng.items())
     cand_total = sum(cand_ng.values())
     ref_total = sum(ref_ng.values())
     
@@ -152,21 +161,21 @@ def get_brevity_penalty(candidate_len: int, closest_ref_len: int) -> float:
 
 def get_modified_precision(candidate: list, references: list, n: int) -> float:
     """
-    Calculates clipped n-gram modified precision across multiple references.
+    Calculates clipped n-gram modified precision across multiple references 
+    using standard dictionaries instead of Counter.
     """
-    cand_ngrams = get_ngrams(candidate, n)
-    if not cand_ngrams:
-        return 0.0
-    cand_counts = Counter(cand_ngrams)
-
-    max_ref_counts = Counter()
-    for ref in references:
-        ref_counts = Counter(get_ngrams(ref, n))
-        for ng in ref_counts:
-            max_ref_counts[ng] = max(max_ref_counts[ng], ref_counts[ng])
-
-    clipped = sum(min(cand_counts[ng], max_ref_counts.get(ng, 0)) for ng in cand_counts)
+    cand_counts = get_ngrams_dict(candidate, n)
     total = sum(cand_counts.values())
+    if total == 0:
+        return 0.0
+
+    max_ref_counts = {}
+    for ref in references:
+        ref_counts = get_ngrams_dict(ref, n)
+        for ng, count in ref_counts.items():
+            max_ref_counts[ng] = max(max_ref_counts.get(ng, 0), count)
+
+    clipped = sum(min(count, max_ref_counts.get(ng, 0)) for ng, count in cand_counts.items())
     return clipped / total if total > 0 else 0.0
 
 
