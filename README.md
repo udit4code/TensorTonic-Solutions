@@ -125,6 +125,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Evaluation Metrics (BLEU, ROUGE) | Compute corpus BLEU and ROUGE overlap metrics for generated text using the specified token and n-gram rules. | https://www.tensortonic.com/problems/nlp-evaluation-metrics-bleu-rouge |
 | Named Entity Recognition | Tag tokenized sentences with dictionary-backed named entity labels while preserving sentence and token order. | https://www.tensortonic.com/problems/nlp-ner |
 | POS Tagging | Assign part-of-speech tags using each word's most frequent training tag and a deterministic fallback for unseen words. | https://www.tensortonic.com/problems/nlp-pos-tagging |
+| Tokenization | Tokenize raw text by scanning characters into words, punctuation marks, and supported special token forms. | https://www.tensortonic.com/problems/nlp-tokenization |
 | Normalize 3D Vectors | Normalize a 3D vector to unit length in NumPy while returning the required result for a zero vector. | https://www.tensortonic.com/problems/normalize-3d |
 | Aggregation Functions | Compute selected NumPy aggregation functions globally or along a requested axis using float64 values. | https://www.tensortonic.com/problems/numpy-aggregation |
 | Angle Features | Return a float64 array where row 0 contains the sine values, row 1 the cosine values, and row 2 the tangent values. | https://www.tensortonic.com/problems/numpy-angle-features |
