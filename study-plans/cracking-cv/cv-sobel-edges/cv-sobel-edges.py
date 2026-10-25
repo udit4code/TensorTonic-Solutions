@@ -9,14 +9,14 @@ def sobel_edges(image: list) -> dict:
   img = np.asarray(image, dtype=np.float64)
   H, W = img.shape
 
-  # Define standard Sobel kernels for horizontal (Gx) and vertical (Gy) gradients
+  # Step 1 : Define standard Sobel kernels for horizontal (Gx) and vertical (Gy) gradients
   Kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float64)
   Ky = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float64)
 
-  # Pad the image with zeros (1 pixel border for 3x3 kernel)
+  # Step 2 : Pad the image with zeros (1 pixel border for 3x3 kernel)
   padded = np.pad(img, pad_width=1, mode="constant", constant_values=0.0)
 
-  # Perform 2D convolution efficiently using NumPy slices
+  # Step 3 : Perform 2D convolution efficiently using NumPy slices
   gx = np.zeros((H, W), dtype=np.float64)
   gy = np.zeros((H, W), dtype=np.float64)
 
@@ -26,10 +26,10 @@ def sobel_edges(image: list) -> dict:
       gx += window * Kx[i, j]
       gy += window * Ky[i, j]
 
-  # Compute gradient magnitude
+  # Step 4 : Compute gradient magnitude
   magnitude = np.sqrt(gx**2 + gy**2)
 
-  # Round to 4 decimals and convert back to standard Python lists
+  # Step 5 : Round to 4 decimals and convert back to standard Python lists
   return {
       "gx": np.round(gx, 4).tolist(),
       "gy": np.round(gy, 4).tolist(),
