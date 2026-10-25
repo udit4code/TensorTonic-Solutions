@@ -13,7 +13,13 @@ def sobel_edges(image: list) -> dict:
     Ky = np.asarray([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float64)
     
     # Step 2 : Pad the image with zeros (1 pixel border for 3x3 kernel)
-    padded = np.pad(img, pad_width=1, mode="constant", constant_values=0.0)
+    # np.pad() is a NumPy function used to add padding (extra elements/borders) around the edges of an array.
+    # [[1, 2], [3, 4]] -> 
+    #    [[0 0 0 0]
+    #     [0 1 2 0]
+    #     [0 3 4 0]
+    #     [0 0 0 0]]
+    padded = np.pad(array=img, pad_width=1, mode="constant", constant_values=0.0)
     
     # Step 3 : Perform 2D convolution efficiently using NumPy slices
     gx = np.zeros((H, W), dtype=np.float64)
