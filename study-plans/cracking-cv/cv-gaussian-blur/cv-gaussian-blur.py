@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def _create_gaussian_kernel(kernel_size: int, sigma: float) -> np.ndarray:
+def create_gaussian_kernel(kernel_size: int, sigma: float) -> np.ndarray:
   """Generates and normalizes a 2D Gaussian kernel using separable 1D vectors."""
   k = int(kernel_size)
   c = (k - 1) / 2.0
@@ -13,7 +13,7 @@ def _create_gaussian_kernel(kernel_size: int, sigma: float) -> np.ndarray:
   return G_2d / np.sum(G_2d)
 
 
-def _pad_image(img: np.ndarray, kernel_size: int) -> np.ndarray:
+def pad_image(img: np.ndarray, kernel_size: int) -> np.ndarray:
   """Pads the image with zeros using zero-allocation arrays."""
   H, W = img.shape
   k = int(kernel_size)
@@ -24,7 +24,7 @@ def _pad_image(img: np.ndarray, kernel_size: int) -> np.ndarray:
   return padded
 
 
-def _convolve_2d(padded_img: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+def convolve_2d(padded_img: np.ndarray, kernel: np.ndarray) -> np.ndarray:
   """Performs pixel-centric 2D convolution by sliding a local window."""
   k = kernel.shape[0]
   H = padded_img.shape[0] - k + 1
@@ -46,14 +46,14 @@ def gaussian_blur_2d(image: list, kernel_size: int, sigma: float) -> list:
   """
   img = np.asarray(image, dtype=np.float64)
 
-  # 1. Generate kernel
-  kernel = _create_gaussian_kernel(kernel_size, sigma)
+  # Step 1 : Generate kernel
+  kernel = create_gaussian_kernel(kernel_size, sigma)
 
-  # 2. Pad image borders
-  padded_img = _pad_image(img, kernel_size)
+  # Step 2 : Pad image borders
+  padded_img = pad_image(img, kernel_size)
 
-  # 3. Apply convolution
-  blurred = _convolve_2d(padded_img, kernel)
+  # Step 3 : Apply convolution
+  blurred = convolve_2d(padded_img, kernel)
 
-  # 4. Round and format output
+  # Step 4 : Round and format output
   return np.round(blurred, 4).tolist()
