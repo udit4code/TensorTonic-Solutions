@@ -10,8 +10,8 @@ def sobel_edges(image: list) -> dict:
   H, W = img.shape
 
   # Step 1 : Define standard Sobel kernels for horizontal (Gx) and vertical (Gy) gradients
-  Kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float64)
-  Ky = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float64)
+  Kx = np.asarray([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float64)
+  Ky = np.asarray([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float64)
 
   # Step 2 : Pad the image with zeros (1 pixel border for 3x3 kernel)
   padded = np.pad(img, pad_width=1, mode="constant", constant_values=0.0)
