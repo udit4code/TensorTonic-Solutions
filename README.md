@@ -45,6 +45,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Find Reusable Prefixes in a KV Trie | Build a deterministic token trie for cached sequences and find the longest reusable prefix for each request. | https://www.tensortonic.com/problems/cs336-l18-kv-prefix-trie |
 | Bilinear Resize | Resize a grayscale image with corner-aligned bilinear interpolation matching PyTorch interpolation semantics. | https://www.tensortonic.com/problems/cv-bilinear-resize |
 | Per-Channel Mean and Std | Compute population means and standard deviations for every channel across a batch of images in NHWC layout. | https://www.tensortonic.com/problems/cv-channel-statistics |
+| Complete IoU Loss | Compute Complete IoU loss for aligned boxes using overlap, center-distance, and aspect-ratio penalties. | https://www.tensortonic.com/problems/cv-ciou-loss |
 | Gaussian Blur 2D | Build a normalized separable Gaussian kernel and apply it to a grayscale image with the specified padding behavior. | https://www.tensortonic.com/problems/cv-gaussian-blur |
 | Image Normalize | Normalize each image channel by its supplied mean and standard deviation to produce standardized vision-model inputs. | https://www.tensortonic.com/problems/cv-image-normalize |
 | RGB to Grayscale | Convert an RGB image to grayscale with luminance-weighted color channels for classical computer vision preprocessing. | https://www.tensortonic.com/problems/cv-rgb-to-grayscale |
