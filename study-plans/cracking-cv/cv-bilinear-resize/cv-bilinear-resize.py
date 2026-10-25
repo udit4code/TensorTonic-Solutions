@@ -9,48 +9,48 @@ def bilinear_resize(image: list, new_h: int, new_w: int) -> list:
   img = np.asarray(image, dtype=np.float64)
   is_3d = img.ndim == 3
 
-  # Step 1 :Add a dummy channel dimension if 2D for uniform processing
+  # Step 1 : Add a dummy channel dimension if 2D for uniform processing
   if not is_3d:
     img = img[..., np.newaxis]
 
   H, W, C = img.shape
 
-  # Initialize an empty output array for the resized image
+  # Step 2 : Initialize an empty output array for the resized image
   res = np.zeros((new_h, new_w, C), dtype=np.float64)
 
-  # Iterate through every pixel in the new target image
+  # Step 3 : Iterate through every pixel in the new target image
   for i in range(new_h):
     for j in range(new_w):
-      # 1. Corner-aligned coordinate mapping back to the source image
+      # Step 3.1 : Corner-aligned coordinate mapping back to the source image
       y = i * (H - 1) / (new_h - 1) if new_h > 1 else 0.0
       x = j * (W - 1) / (new_w - 1) if new_w > 1 else 0.0
 
-      # 2. Find integer bounding box indices (top-left neighbors)
+      # Step 3.2 : Find integer bounding box indices (top-left neighbors)
       y0 = int(np.floor(y))
       x0 = int(np.floor(x))
 
-      # Find bottom-right neighbors with boundary clipping
+      # Step 3.3 : Find bottom-right neighbors with boundary clipping
       y1 = min(y0 + 1, H - 1)
       x1 = min(x0 + 1, W - 1)
       y0 = max(min(y0, H - 1), 0)
       x0 = max(min(x0, W - 1), 0)
 
-      # 3. Calculate fractional weights for interpolation
+      # Step 3.4 : Calculate fractional weights for interpolation
       dy = y - y0
       dx = x - x0
 
-      # 4. Extract the four surrounding pixel values
+      # Step 3.5 : Extract the four surrounding pixel values
       Ia = img[y0, x0]  # Top-left
       Ib = img[y1, x0]  # Bottom-left
       Ic = img[y0, x1]  # Top-right
       Id = img[y1, x1]  # Bottom-right
 
-      # 5. Apply bilinear interpolation formula
+      # Step 3.6 : Apply bilinear interpolation formula
       top = Ia * (1 - dx) + Ic * dx
       bottom = Ib * (1 - dx) + Id * dx
       res[i, j] = top * (1 - dy) + bottom * dy
 
-  # Strip dummy channel dimension if input was originally 2D
+  # Step 4 : Strip dummy channel dimension if input was originally 2D
   if not is_3d:
     res = res[..., 0]
 
