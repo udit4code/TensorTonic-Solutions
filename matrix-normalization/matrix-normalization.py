@@ -54,7 +54,6 @@ def matrix_normalization(matrix, axis=None, norm_type='l2'):
     """
     Normalize a 2D matrix along specified axis using specified norm.
     """
-    # Write code here
     try:
         matrix = np.array(matrix, dtype=float)
     except (TypeError, ValueError):
