@@ -43,8 +43,8 @@ def batch_gd_compare(X: list, y: list, batch_sizes: list, n_epochs: int, lr: flo
     """
     Returns one post-epoch MSE loss curve per batch size.
     """
-    X_arr = np.asarray(X, dtype=float)
-    y_arr = np.asarray(y, dtype=float)
+    X_arr = np.asarray(X, dtype=np.float32)
+    y_arr = np.asarray(y, dtype=np.float32)
     n_samples, n_features = X_arr.shape
     
     all_curves = []
