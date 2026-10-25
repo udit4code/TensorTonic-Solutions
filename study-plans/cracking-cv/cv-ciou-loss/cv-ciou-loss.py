@@ -1,5 +1,4 @@
 import math
-import numpy as np 
 
 def get_ciou_loss_per_box(pred_box: list, target_box: list) -> float:
     """
