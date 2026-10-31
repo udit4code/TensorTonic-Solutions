@@ -35,6 +35,7 @@ def bellman_expectation_backup(P: list, R: list, policy: list, gamma: float, V: 
     return np.round(V_new, 4).tolist()
     
 
+# This is the Naive Implementation, using Nested For-Loops. 
 def bellman_expectation_backup_naive(P: list, R: list, policy: list, gamma: float, V: list) -> list:
     """
     Returns one updated state value per state, rounded to four decimals.
