@@ -1,4 +1,41 @@
-def bellman_expectation_backup(P: list, R: list, policy: list, gamma: float, V: list) -> list:
+
+import numpy as np
+
+# Instead of using nested for loops over states, actions, and next states, 
+# this version uses NumPy broadcasting and tensor dot-products (np.sum). 
+# It runs entirely in C, making it lightning-fast for large Markov Decision Processes.
+def bellman_expectation_backup(P: list, R: list, policy: list, gamma: float, V: list) -> np.ndarray:
+    """
+    Performs a vectorized Bellman expectation backup using NumPy, rounded to four decimals.
+    
+    Expected Shapes:
+    - P: (num_states, num_actions, num_states)
+    - R: (num_states, num_actions) or (num_states, num_actions, num_states)
+    - policy: (num_states, num_actions)
+    - V: (num_states,)
+    """
+    P = np.asarray(P, dtype=float)
+    R = np.asarray(R, dtype=float)
+    policy = np.asarray(policy, dtype=float)
+    V = np.asarray(V, dtype=float)
+    
+    # If R is 2D shape (S, A), expand it to (S, A, 1) for broadcasting against P and V
+    if R.ndim == 2:
+        R = R[..., None]
+        
+    # 1. Compute Q-values for all state-action pairs:
+    # Q(s, a) = sum_{s'} P(s'|s,a) * [R(s,a,s') + gamma * V(s')]
+    # V automatically broadcasts across the last axis (s') -> shape (1, 1, S')
+    Q = np.sum(P * (R + gamma * V), axis=-1)  # Result shape: (num_states, num_actions)
+    
+    # 2. Compute expected state values under the policy:
+    # V_new(s) = sum_a policy(a|s) * Q(s, a)
+    V_new = np.sum(policy * Q, axis=1)        # Result shape: (num_states,)
+
+    return np.round(V_new, 4).tolist()
+    
+
+def bellman_expectation_backup_naive(P: list, R: list, policy: list, gamma: float, V: list) -> list:
     """
     Returns one updated state value per state, rounded to four decimals.
     """
