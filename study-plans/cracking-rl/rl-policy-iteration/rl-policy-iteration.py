@@ -1,4 +1,52 @@
+import numpy as np
+
 def policy_iteration(P: list, R: list, gamma: float, eval_tol: float = 1e-8, max_iters: int = 200) -> tuple:
+    """
+    Returns (values, policy): rounded float values and integer actions, one per state.
+    Optimized with NumPy vectorization.
+    """
+    P_arr = np.array(P)
+    R_arr = np.array(R)
+    S = P_arr.shape[0]
+    
+    # Initialize policy and value function
+    policy = np.zeros(S, dtype=int)
+    V = np.zeros(S)
+    
+    for iteration in range(max_iters):
+        # Phase 1: Policy Evaluation (Synchronous, retaining V between evaluations)
+        while True:
+            # Extract transition probabilities and rewards corresponding to the current policy
+            P_pi = P_arr[np.arange(S), policy]
+            R_pi = R_arr[np.arange(S), policy]
+            
+            # Synchronously update values across all states
+            V_new = np.sum(P_pi * (R_pi + gamma * V), axis=-1)
+            
+            delta = np.max(np.abs(V - V_new))
+            V = V_new
+            
+            if delta < eval_tol:
+                break
+        
+        # Phase 2: Policy Improvement
+        # Compute Q-values for all state-action pairs (shape: S x A)
+        q_values = np.sum(P_arr * (R_arr + gamma * V), axis=-1)
+        
+        # Select greedy action; np.argmax inherently chooses the lowest action index on ties
+        new_policy = np.argmax(q_values, axis=1)
+        
+        # Check if the policy has stabilized
+        if np.array_equal(new_policy, policy):
+            break
+            
+        policy = new_policy
+        
+    rounded_values = np.round(V, 4).tolist()
+    return (rounded_values, policy.tolist())
+    
+
+def policy_iteration_naive(P: list, R: list, gamma: float, eval_tol: float = 1e-8, max_iters: int = 200) -> tuple:
     """
     Returns (values, policy): rounded float values and integer actions, one per state.
     Implemented using naive for loops.
