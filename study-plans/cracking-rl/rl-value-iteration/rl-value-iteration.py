@@ -1,4 +1,54 @@
+import numpy as np
+
 def value_iteration(P: list, R: list, gamma: float, tol: float = 1e-6, max_iters: int = 1000) -> tuple:
+    """
+    Returns a Python tuple (V, policy): a list of state-value floats rounded to four decimals, 
+    followed by a list of integer action indices, one entry per state, optimized with NumPy.
+    """
+    # Step 1: Convert input lists to NumPy arrays for vectorized operations
+    P_arr = np.array(P)
+    R_arr = np.array(R)
+    S = P_arr.shape[0]
+    
+    # Step 2: Initialize the value function array with zeros for all states
+    V = np.zeros(S)
+    
+    # Step 3: Iterate until convergence or max iterations are reached
+    for iteration in range(max_iters):
+        # Step 3.1: Compute Q-values for all state-action pairs simultaneously (shape: S x A)
+        # Broadcasting handles gamma * V across the next-state dimension, 
+        # and np.sum reduces over the next-state axis (-1).
+        q_values = np.sum(P_arr * (R_arr + gamma * V), axis=-1)
+        
+        # Step 3.2: Apply the Bellman Optimality operator by taking the max over actions (axis=1)
+        V_new = np.max(q_values, axis=1)
+        
+        # Step 3.3: Compute the maximum change (delta) across all states for convergence testing
+        delta = np.max(np.abs(V - V_new))
+        
+        # Step 3.4: Update value function for the next iteration
+        V = V_new
+        
+        # Step 3.5: Check convergence condition
+        if delta < tol:
+            break
+            
+    # Step 4: Compute final Q-values using the converged value function
+    q_values_final = np.sum(P_arr * (R_arr + gamma * V), axis=-1)
+    
+    # Step 5: Extract the greedy policy
+    # np.argmax returns the first occurrence of the maximum value along axis=1, 
+    # which automatically chooses the lowest action index in the event of ties.
+    policy = np.argmax(q_values_final, axis=1).tolist()
+    
+    # Step 6: Round state values to four decimal places and convert to a standard Python list
+    rounded_values = np.round(V, 4).tolist()
+    
+    # Step 7: Return the required tuple (values, policy)
+    return (rounded_values, policy)
+    
+
+def value_iteration_naive(P: list, R: list, gamma: float, tol: float = 1e-6, max_iters: int = 1000) -> tuple:
     """
     Returns a Python tuple (V, policy): a list of state-value floats rounded to four decimals, 
     followed by a list of integer action indices, one entry per state.
