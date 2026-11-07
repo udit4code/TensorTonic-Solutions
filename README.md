@@ -42,6 +42,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Plan KV-Cache Capacity | Calculate model storage, per-request KV storage, maximum fitting batch size, and bandwidth-limited decode throughput. | https://www.tensortonic.com/problems/cs336-l10-kv-cache-capacity-planner |
 | Decode Attention with a KV Cache | Append one key and value position to a KV cache and compute grouped-query attention for the next token. | https://www.tensortonic.com/problems/cs336-l10-kv-cache-decode-step |
 | Perform Stable Exact Deduplication | Normalize document text, retain the earliest exact occurrence, and map every removed document to its retained owner. | https://www.tensortonic.com/problems/cs336-l14-stable-exact-deduplication |
+| Patchify a Batch of Images | Split PyTorch image batches into a row-major grid of non-overlapping flattened Vision Transformer patches. | https://www.tensortonic.com/problems/cs336-l17-vision-transformer-patchify |
 | Find Reusable Prefixes in a KV Trie | Build a deterministic token trie for cached sequences and find the longest reusable prefix for each request. | https://www.tensortonic.com/problems/cs336-l18-kv-prefix-trie |
 | Bilinear Resize | Resize a grayscale image with corner-aligned bilinear interpolation matching PyTorch interpolation semantics. | https://www.tensortonic.com/problems/cv-bilinear-resize |
 | Per-Channel Mean and Std | Compute population means and standard deviations for every channel across a batch of images in NHWC layout. | https://www.tensortonic.com/problems/cv-channel-statistics |
