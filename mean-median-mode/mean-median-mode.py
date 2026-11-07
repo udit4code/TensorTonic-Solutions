@@ -13,10 +13,13 @@ def mean_median_mode(x: list) -> dict:
     median_val = float(np.median(x))
     
     # Calculate mode(s) using Counter
-    counts = Counter(x)
-    max_freq = max(counts.values())
-    modes = sorted([k for k, v in counts.items() if v == max_freq])
-    # If there is a single mode, return it as a scalar; otherwise, return the list of modes
+    frequency_map = {}
+    for x_item in x:
+        if x_item not in frequency_map:
+            frequency_map[x_item] = 0
+        frequency_map[x_item] += 1
+    max_freq = max(frequency_map.values())
+    modes = sorted([k for k, v in frequency_map.items() if v == max_freq])
     mode_val = float(modes[0])
 
     return {
