@@ -108,6 +108,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Implement Min-Max Normalization | Normalize each NumPy feature to the zero-to-one range with explicit handling for constant columns. | https://www.tensortonic.com/problems/minmax-normalization |
 | AdaBoost from Scratch | Implement AdaBoost binary classification using decision stumps, weighted errors, adaptive sample weights, and weighted voting. | https://www.tensortonic.com/problems/ml-adaboost |
 | Agglomerative Clustering | Implement agglomerative hierarchical clustering with single, complete, and average linkage and deterministic cluster labels. | https://www.tensortonic.com/problems/ml-agglomerative |
+| AUC-ROC from Scratch | Build an AUC-ROC evaluator by ranking prediction scores, computing TPR and FPR, and integrating with the trapezoidal rule. | https://www.tensortonic.com/problems/ml-auc-roc |
 | Bagging Classifier | Build a bagging classifier from scratch using bootstrap-sampled CART trees and majority-vote predictions. | https://www.tensortonic.com/problems/ml-bagging-classifier |
 | Decision Tree Classifier (CART) | Implement a CART decision tree classifier with Gini impurity splits, depth limits, and majority-class leaf predictions. | https://www.tensortonic.com/problems/ml-cart-classifier |
 | Decision Tree Regressor | Implement a CART regression tree with MSE reduction splits, stopping criteria, and mean-value leaf predictions. | https://www.tensortonic.com/problems/ml-cart-regressor |
