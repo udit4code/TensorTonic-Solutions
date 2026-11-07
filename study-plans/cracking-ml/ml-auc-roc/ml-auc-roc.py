@@ -1,6 +1,6 @@
 import numpy as np
 
-def _roc_curve_stats(y_true: list, y_scores: list) -> tuple:
+def get_roc_curve_stats(y_true: list, y_scores: list) -> tuple:
     """
     Helper function to compute FPR and TPR lists across distinct score thresholds.
     """
@@ -34,19 +34,11 @@ def _roc_curve_stats(y_true: list, y_scores: list) -> tuple:
     return [0.0] + fprs, [0.0] + tprs
 
 
-def get_true_positive_rate_list(y_true: list, y_scores: list) -> list:
-    """
-    Returns the list of True Positive Rates (TPR) corresponding to the ROC curve.
-    """
-    _, tprs = _roc_curve_stats(y_true, y_scores)
-    return tprs
-
-
 def auc_roc(y_true: list, y_scores: list) -> tuple:
     """
     Returns false-positive rates, true-positive rates, and AUC.
     """
-    false_positive_rate_list, true_positive_rate_list = _roc_curve_stats(y_true, y_scores)
+    false_positive_rate_list, true_positive_rate_list = get_roc_curve_stats(y_true, y_scores)
     
     # Compute Area Under the Curve using the trapezoidal rule (version-safe)
     x = np.array(false_positive_rate_list)
