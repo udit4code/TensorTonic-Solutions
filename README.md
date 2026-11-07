@@ -49,6 +49,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Complete IoU Loss | Compute Complete IoU loss for aligned boxes using overlap, center-distance, and aspect-ratio penalties. | https://www.tensortonic.com/problems/cv-ciou-loss |
 | Gaussian Blur 2D | Build a normalized separable Gaussian kernel and apply it to a grayscale image with the specified padding behavior. | https://www.tensortonic.com/problems/cv-gaussian-blur |
 | Image Normalize | Normalize each image channel by its supplied mean and standard deviation to produce standardized vision-model inputs. | https://www.tensortonic.com/problems/cv-image-normalize |
+| ViT Patchify | Split image batches into row-major non-overlapping patches and flatten each patch in spatial-then-channel order. | https://www.tensortonic.com/problems/cv-patchify |
 | RGB to Grayscale | Convert an RGB image to grayscale with luminance-weighted color channels for classical computer vision preprocessing. | https://www.tensortonic.com/problems/cv-rgb-to-grayscale |
 | Sobel Edge Detection | Apply horizontal and vertical Sobel filters to a grayscale image with one-pixel zero padding and return edge gradients. | https://www.tensortonic.com/problems/cv-sobel-edges |
 | Zero Pad and Center Crop | Zero-pad a two-dimensional grayscale image on every side, then extract a centered crop with the requested dimensions. | https://www.tensortonic.com/problems/cv-zero-pad-and-center-crop |
