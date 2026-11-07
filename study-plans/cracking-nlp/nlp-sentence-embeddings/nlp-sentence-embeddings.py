@@ -1,5 +1,5 @@
 import numpy as np
-from collections import Counter
+
 
 def get_embedding_dimension(vocab: dict) -> int:
     """
@@ -78,6 +78,15 @@ def pool_vectors(vectors_arr: np.ndarray, tokens: list, method: str, word_probs:
         raise ValueError(f"Unknown pooling method: '{method}'. Choose from 'mean', 'max', or 'sif'.")
 
 
+# Q: How did we calculate sentence embeddings, before using static word vectors ? 
+# Ans : In the context of pooling-based approaches (especially with static word vectors like Word2Vec, 
+# GloVe, or FastText), a sentence embedding is indeed formed by taking the individual vector representations 
+# of its words and aggregating them using a mathematical function (like mean, max, or SIF weighting). 
+# We treat a sentence as a "bag (multiset) of vectors," where word order doesn't strictly matter 
+# to the pooling operation itself, and everything is reduced to a single vector through averaging, taking maximums, or frequency weighting. A bag (or multiset) preserves frequencies. 
+# Because our implementation loops through every token occurrence in the sentence (for token in tokens), 
+# repeating a word means its vector is included multiple times, 
+# which properly pulls the mean or sum in that direction.
 def sentence_embeddings(sentences: list, vocab: dict, method: str = 'mean', sif_a: float = 0.001) -> list:
     """
     Pools supplied word embeddings into one vector per sentence using mean, max, or sif.
@@ -91,36 +100,31 @@ def sentence_embeddings(sentences: list, vocab: dict, method: str = 'mean', sif_
     Returns:
     - A list of float lists, where each list represents a sentence embedding.
     """
-    # 1. Infer dimension or default to 1 if vocab is empty
+    # Step 1 : Infer dimension or default to 1 if vocab is empty
     dim = get_embedding_dimension(vocab)
     
-    # 2. Normalize method name
+    # Step 2 : Normalize method name
     method = method.lower()
     if method in ('weighted', 'weighted_mean'):
         method = 'sif'
         
-    # 3. Pre-compute corpus word probabilities if SIF pooling is requested
+    # Step 3 : Pre-compute corpus word probabilities if SIF pooling is requested
     word_probs = compute_corpus_probabilities(sentences) if method == 'sif' else {}
-    
     embeddings = []
     
-    # 4. Process each sentence individually
+    # Step 4 : Process each sentence individually
     for sent in sentences:
         tokens = sent.split() if isinstance(sent, str) else sent
-        
-        # Handle empty sentences with a zero vector
+        # Step 4.1 : Handle empty sentences with a zero vector
         if not tokens:
             embeddings.append(np.zeros(dim).tolist())
-            continue
-            
-        # Collect vectors for all tokens in the sentence (using zero vectors for OOV tokens)
+            continue  
+        # Step 4.2 Collect vectors for all tokens in the sentence (using zero vectors for OOV tokens)
         vectors = [get_token_vector(token, vocab, dim) for token in tokens]
         vectors_arr = np.array(vectors)  # Shape: (num_tokens, dim)
-        
-        # Apply the chosen pooling method
+        # Step 4.3 : Apply the chosen pooling method
         sent_vec = pool_vectors(vectors_arr, tokens, method, word_probs, sif_a)
-        
-        # Convert NumPy array back to a Python list
+        # Step 4.4 : Convert NumPy array back to a Python list
         embeddings.append(sent_vec.tolist())
         
     return embeddings
