@@ -15,7 +15,17 @@ def get_embedding_dimension(vocab: dict) -> int:
         return len(sample_vec)
     return 1
 
-
+# Q : Why do we apply SIF weighing ? 
+# Ans : When we take a simple average (mean pooling) of word vectors in a sentence, 
+# high-frequency words (like "the", "is", "and", "of") dominate the mathematical space.
+# Because they appear everywhere, they pull the average vector in a generic direction,
+# washing out the rare, content-bearing words that actually define what the sentence is about.
+# To fix this, SIF applies a frequency-based weight to each word before averaging them.
+# INTUITION : 
+# Case 1 for common words/stop words : If a word like "the" has a high probability p(w) = 0.05, the denominator becomes relatively large compared to a (Say, 0.001).
+# Then, in that case, 0.001 / (0.001 + 0.05) = approx 0.02 . 
+# Case 2 for Rare/Content Words: If a word like "quantum" has a tiny probability p(w) = 0.00001, it is dwarfed by a, as 0.001/ (0.001 + 0.00001) = approx 0.99 . The weight stays close to 1, 
+# allowing the unique semantic meaning of the word to be preserved in the sentence vector.
 def compute_corpus_probabilities(sentences: list) -> dict:
     """
     Computes token probabilities p(w) across the entire corpus 
