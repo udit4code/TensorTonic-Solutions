@@ -59,6 +59,13 @@ def compute_perplexity(token_ids: list, logits: list) -> dict:
     probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
     
     # Extract the probability assigned to the actual target tokens
+    # HOW NUMPY FANCY INDEXING WORKS HERE:
+    # We want to pull out a specific probability from every row of our 'probs' matrix.
+    # 'probs' has shape (seq_len, vocab_size) -> rows are positions, columns are vocabulary tokens.
+    # 1. np.arange(len(token_ids)) creates row indices: [0, 1, 2, ...] (each position in the text)
+    # 2. token_ids gives the column indices (the exact correct token IDs we want to check)
+    # By passing both lists into NumPy like probs[[row_indices], [column_indices]], 
+    # it pairs them up to grab exactly the probability of the right answer at every step.
     token_probabilities = probs[np.arange(len(token_ids)), token_ids]
     
     # Clip probabilities to prevent log(0) errors
