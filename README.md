@@ -137,6 +137,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Bag of Words | Build an alphabetical vocabulary and document-term count matrix from a corpus of tokenized documents. | https://www.tensortonic.com/problems/nlp-bag-of-words |
 | Evaluation Metrics (BLEU, ROUGE) | Compute corpus BLEU and ROUGE overlap metrics for generated text using the specified token and n-gram rules. | https://www.tensortonic.com/problems/nlp-evaluation-metrics-bleu-rouge |
 | Named Entity Recognition | Tag tokenized sentences with dictionary-backed named entity labels while preserving sentence and token order. | https://www.tensortonic.com/problems/nlp-ner |
+| Perplexity Computation | Compute sequence perplexity from token IDs and precomputed next-token logits using stable log probabilities. | https://www.tensortonic.com/problems/nlp-perplexity-computation |
 | POS Tagging | Assign part-of-speech tags using each word's most frequent training tag and a deterministic fallback for unseen words. | https://www.tensortonic.com/problems/nlp-pos-tagging |
 | Sentence Embeddings | Create fixed-size sentence embeddings with mean, maximum, or weighted pooling over aligned token vectors. | https://www.tensortonic.com/problems/nlp-sentence-embeddings |
 | TF-IDF | Build a vocabulary V sorted alphabetically and compute the TF-IDF score for every term in every document. | https://www.tensortonic.com/problems/nlp-tfidf |
