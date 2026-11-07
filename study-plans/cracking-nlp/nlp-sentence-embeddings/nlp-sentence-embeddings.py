@@ -22,12 +22,14 @@ def compute_corpus_probabilities(sentences: list) -> dict:
     for use in SIF (Smooth Inverse Frequency) weighting.
     """
     total_tokens = 0
-    token_counts = Counter()
+    token_counts = {}
     
     for sent in sentences:
         # Split string into tokens if sentence is a string; otherwise use as-is
         tokens = sent.split() if isinstance(sent, str) else sent
         for token in tokens:
+            if token not in token_counts:
+                token_counts[token] = 0
             token_counts[token] += 1
             total_tokens += 1
             
