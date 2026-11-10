@@ -10,18 +10,27 @@ def max_pool_2d(image: list, kernel_size: int, stride: int) -> list:
     """
     Returns the max-pooled 2D list of floats using NumPy stride tricks, rounded to four decimals.
     """
+    # Convert input list to a 2D NumPy array of floats
     img = np.asarray(image, dtype=float)
     H, W = img.shape
     
+    # Calculate the height and width of the output pooled matrix
     out_H = (H - kernel_size) // stride + 1
     out_W = (W - kernel_size) // stride + 1
     
-    # Create a memory-efficient strided view of the sliding windows
+    # Define the shape of the 4D view: (output_rows, output_cols, kernel_rows, kernel_cols)
     shape = (out_H, out_W, kernel_size, kernel_size)
+    
+    # Define byte strides: 
+    # - Jump by 'stride' steps in memory for output coordinates
+    # - Jump by 1 step in memory for internal kernel coordinates
     strides = (img.strides[0] * stride, img.strides[1] * stride, img.strides[0], img.strides[1])
+    
+    # Create a zero-copy, memory-efficient view of all sliding windows simultaneously
     patches = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
     
-    # Find the max over the kernel dimensions and round
+    # Find the maximum value across the last two axes (the kernel patch dimensions),
+    # round to 4 decimal places, and convert back to a standard nested Python list
     pooled = np.round(patches.max(axis=(-1, -2)), 4)
     return pooled.tolist()
 
