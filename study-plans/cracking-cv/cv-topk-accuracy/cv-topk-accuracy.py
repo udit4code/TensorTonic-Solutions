@@ -1,7 +1,5 @@
 import torch
 
-import torch
-
 def topk_accuracy(logits: list, targets: list, k: int) -> float:
     """
     Returns the top-k accuracy as a float, rounded to 4 decimals, using torch.argsort.
@@ -12,25 +10,26 @@ def topk_accuracy(logits: list, targets: list, k: int) -> float:
     
     N, num_classes = logits.shape  
     
-    # Ensure k does not exceed the total number of available classes
+    # Step 0 : Ensure k does not exceed the total number of available classes
     k = min(k, num_classes)
     
-    # Use torch.argsort in descending order with stable=True.
+    # Step 1 : Use torch.argsort in descending order with stable=True.
     # Because columns are ordered from class index 0 to num_classes - 1,
     # a stable sort preserves the original column order for equal logit values,
     # automatically breaking ties in favor of the lower class index.
     sorted_indices = torch.argsort(logits, dim=1, descending=True, stable=True)
     
-    # Select the top-k predicted class indices for each sample
+    # Step 2 : Select the top-k predicted class indices for each sample
     topk_preds = sorted_indices[:, :k]
     
-    # Reshape targets to (N, 1) for broadcast comparison against top-k predictions
+    # Step 3 : Reshape targets to (N, 1) for broadcast comparison against top-k predictions
+    # Why ? targets is initially shaped as (N,)
     targets_reshaped = targets.view(-1, 1)
     
-    # Check if the ground truth target is present anywhere within the top-k predictions
+    # Step 4 : Check if the ground truth target is present anywhere within the top-k predictions
     correct = (topk_preds == targets_reshaped).any(dim=1).sum().item()
     
-    # Compute accuracy ratio and round to 4 decimal places
+    # Step 5 : Compute accuracy ratio and round to 4 decimal places
     accuracy = correct / N
     return round(float(accuracy), 4)
 
