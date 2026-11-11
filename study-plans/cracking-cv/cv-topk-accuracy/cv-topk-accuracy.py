@@ -1,29 +1,40 @@
-import torch 
+import torch
+
+import torch
 
 def topk_accuracy(logits: list, targets: list, k: int) -> float:
     """
-    Returns the top-k accuracy as a float, rounded to 4 decimals, using a simple for loop.
+    Returns the top-k accuracy as a float, rounded to 4 decimals, using torch.argsort.
+    Breaks ties by lower class index, including ties at the cutoff.
     """
-    total = len(targets)
-    if total == 0:
-        return 0.0
+    logits = torch.tensor(logits, dtype=torch.float32)
+    targets = torch.tensor(targets, dtype=torch.long)
     
-    correct_count = 0
+    N, num_classes = logits.shape  
     
-    # Iterate through each sample's logits and its corresponding target label
-    for sample_logits, target in zip(logits, targets):
-        # Sort the class indices based on their logit scores in descending order
-        sorted_indices = sorted(range(len(sample_logits)), key=lambda i: sample_logits[i], reverse=True)
-        
-        # Select the top-k predicted class indices
-        top_k_indices = sorted_indices[:k]
-        
-        # Check if the true target is present in the top-k predictions
-        if target in top_k_indices:
-            correct_count += 1
-            
+    # Ensure k does not exceed the total number of available classes
+    k = min(k, num_classes)
+    
+    # Use torch.argsort in descending order with stable=True.
+    # Because columns are ordered from class index 0 to num_classes - 1,
+    # a stable sort preserves the original column order for equal logit values,
+    # automatically breaking ties in favor of the lower class index.
+    sorted_indices = torch.argsort(logits, dim=1, descending=True, stable=True)
+    
+    # Select the top-k predicted class indices for each sample
+    topk_preds = sorted_indices[:, :k]
+    
+    # Reshape targets to (N, 1) for broadcast comparison against top-k predictions
+    targets_reshaped = targets.view(-1, 1)
+    
+    # Check if the ground truth target is present anywhere within the top-k predictions
+    correct = (topk_preds == targets_reshaped).any(dim=1).sum().item()
+    
     # Compute accuracy ratio and round to 4 decimal places
-    return round(correct_count / total, 4)
+    accuracy = correct / N
+    return round(float(accuracy), 4)
+
+    
 def topk_accuracy_naive(logits: list, targets: list, k: int) -> float:
     """
     Returns the top-k accuracy as a float, rounded to 4 decimals, using a simple for loop.
