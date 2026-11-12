@@ -149,6 +149,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Perplexity Computation | Compute sequence perplexity from token IDs and precomputed next-token logits using stable log probabilities. | https://www.tensortonic.com/problems/nlp-perplexity-computation |
 | POS Tagging | Assign part-of-speech tags using each word's most frequent training tag and a deterministic fallback for unseen words. | https://www.tensortonic.com/problems/nlp-pos-tagging |
 | Sentence Embeddings | Create fixed-size sentence embeddings with mean, maximum, or weighted pooling over aligned token vectors. | https://www.tensortonic.com/problems/nlp-sentence-embeddings |
+| Sentence Segmentation | Segment text into sentences with rule-based punctuation boundaries while preserving supported abbreviations. | https://www.tensortonic.com/problems/nlp-sentence-segmentation |
 | Spell Correction | Correct misspelled words by minimizing Levenshtein distance, then breaking ties by frequency and lexical order. | https://www.tensortonic.com/problems/nlp-spell-correction |
 | Text Normalization | Normalize text by applying an ordered pipeline of lowercase, punctuation, whitespace, digit, and accent transformations. | https://www.tensortonic.com/problems/nlp-text-normalization |
 | TF-IDF | Build a vocabulary V sorted alphabetically and compute the TF-IDF score for every term in every document. | https://www.tensortonic.com/problems/nlp-tfidf |
