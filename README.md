@@ -147,6 +147,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Evaluation Metrics (BLEU, ROUGE) | Compute corpus BLEU and ROUGE overlap metrics for generated text using the specified token and n-gram rules. | https://www.tensortonic.com/problems/nlp-evaluation-metrics-bleu-rouge |
 | Named Entity Recognition | Tag tokenized sentences with dictionary-backed named entity labels while preserving sentence and token order. | https://www.tensortonic.com/problems/nlp-ner |
 | Next Sentence Prediction | Implement Next Sentence Prediction, and return True if the Jaccard similarity is greater than or equal to the given threshold, and False otherwise. | https://www.tensortonic.com/problems/nlp-next-sentence-prediction |
+| Padding and Truncation | Pad or truncate integer token sequences to a fixed length with configurable padding value and alignment direction. | https://www.tensortonic.com/problems/nlp-padding-truncation |
 | Perplexity Computation | Compute sequence perplexity from token IDs and precomputed next-token logits using stable log probabilities. | https://www.tensortonic.com/problems/nlp-perplexity-computation |
 | POS Tagging | Assign part-of-speech tags using each word's most frequent training tag and a deterministic fallback for unseen words. | https://www.tensortonic.com/problems/nlp-pos-tagging |
 | Sentence Embeddings | Create fixed-size sentence embeddings with mean, maximum, or weighted pooling over aligned token vectors. | https://www.tensortonic.com/problems/nlp-sentence-embeddings |
