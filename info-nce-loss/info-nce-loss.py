@@ -1,6 +1,55 @@
-import numpy as np
+import math
 
 def info_nce_loss(Z1: list, Z2: list, temperature: float = 0.1) -> float:
+    """
+    Computes the InfoNCE loss for contrastive learning using pure Python loops.
+    Returns the loss as a float.
+    """
+    N = len(Z1)
+    d = len(Z1[0])
+    
+    # Ensure both lists have identical dimensions
+    assert len(Z2) == N and all(len(row) == d for row in Z2), "Z1 and Z2 do not have the same shape"
+
+    # Step 2: Compute pairwise dot-product logits (N x N matrix)
+    # Equivalent to: logits = (Z1 @ Z2.T) / temperature
+    logits = []
+    for i in range(N):
+        row = []
+        for j in range(N):
+            # Compute dot product between Z1[i] and Z2[j]
+            dot_product = sum(Z1[i][k] * Z2[j][k] for k in range(d))
+            # Scale by temperature
+            logit = dot_product / temperature
+            row.append(logit)
+        logits.append(row)
+
+    # Step 3 & 4: Compute Numerically Stable Cross-Entropy Loss per row and average
+    total_loss = 0.0
+    for i in range(N):
+        row = logits[i]
+        
+        # Find the max value in the row for numerical stability (LogSumExp trick)
+        max_val = max(row)
+        
+        # Compute sum of exponentials of shifted logits
+        sum_exp = sum(math.exp(val - max_val) for val in row)
+        
+        # Log-sum-exp denominator
+        log_sum_exp = max_val + math.log(sum_exp)
+        
+        # Positive logit is on the diagonal (i == j)
+        pos_logit = row[i]
+        
+        # InfoNCE loss for the current row: -log(exp(pos) / sum(exp(all)))
+        loss_i = -pos_logit + log_sum_exp
+        total_loss += loss_i
+
+    # Average loss over the batch size N
+    return float(total_loss / N)
+
+
+def info_nce_loss_optimised(Z1: list, Z2: list, temperature: float = 0.1) -> float:
     """
     Computes the InfoNCE loss for contrastive learning.
     Returns the loss as a float.
