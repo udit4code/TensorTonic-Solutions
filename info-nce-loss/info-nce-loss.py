@@ -28,19 +28,14 @@ def info_nce_loss(Z1: list, Z2: list, temperature: float = 0.1) -> float:
     total_loss = 0.0
     for i in range(N):
         row = logits[i]
-        
         # Find the max value in the row for numerical stability (LogSumExp trick)
         max_val = max(row)
-        
         # Compute sum of exponentials of shifted logits
         sum_exp = sum(math.exp(val - max_val) for val in row)
-        
         # Log-sum-exp denominator
         log_sum_exp = max_val + math.log(sum_exp)
-        
         # Positive logit is on the diagonal (i == j)
         pos_logit = row[i]
-        
         # InfoNCE loss for the current row: -log(exp(pos) / sum(exp(all)))
         loss_i = -pos_logit + log_sum_exp
         total_loss += loss_i
@@ -48,7 +43,7 @@ def info_nce_loss(Z1: list, Z2: list, temperature: float = 0.1) -> float:
     # Average loss over the batch size N
     return float(total_loss / N)
 
-
+# Using Vectorized Numpy-based implementation
 def info_nce_loss_optimised(Z1: list, Z2: list, temperature: float = 0.1) -> float:
     """
     Computes the InfoNCE loss for contrastive learning.
