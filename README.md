@@ -136,6 +136,7 @@ Verified machine learning implementations completed on [TensorTonic](https://www
 | Gaussian Naive Bayes | Implement Gaussian Naive Bayes with class priors, per-feature Gaussian likelihoods, and log-probability predictions. | https://www.tensortonic.com/problems/ml-gaussian-naive-bayes |
 | Missing Value Imputation | Impute missing numeric values with column-wise mean, median, or most-frequent statistics while preserving observed values. | https://www.tensortonic.com/problems/ml-imputation |
 | Isolation Forest | Implement Isolation Forest anomaly detection with random partition trees and path-length based anomaly scores. | https://www.tensortonic.com/problems/ml-isolation-forest |
+| K-Fold Cross-Validation | Implement deterministic K-fold cross-validation with shuffled splits, held-out evaluation, and aggregated model scores. | https://www.tensortonic.com/problems/ml-kfold-cv |
 | K-Means Clustering | Implement K-means clustering with nearest-centroid assignments, centroid updates, convergence checks, and stable labels. | https://www.tensortonic.com/problems/ml-kmeans |
 | KNN Classifier | Implement K-nearest neighbors classification using Euclidean distance, majority voting, and deterministic tie-breaking. | https://www.tensortonic.com/problems/ml-knn-classifier |
 | Lasso Regression | Implement Lasso regression with gradient descent, an L1 subgradient penalty on weights, and an unregularized bias. | https://www.tensortonic.com/problems/ml-lasso-regression |
